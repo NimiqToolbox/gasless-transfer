@@ -1,0 +1,11 @@
+{
+  "exclude_dependencies": true,
+  "filter_paths": "(test/|script/)",
+  "foundry_compile_all": false,
+  "exclude_informational": false,
+  "exclude_low": false,
+  "exclude_medium": false,
+  "exclude_high": false,
+  "exclude_optimization": false,
+  "disable_color": true
+}

@@ -1,0 +1,58 @@
+# Pinned per docs/STEP-1-GAS-ABSTRACTION.md §11. Build instructions: docs/DEVELOPMENT.md.
+[profile.default]
+src = "src"
+test = "test"
+script = "script"
+out = "out"
+libs = ["lib"]
+solc_version = "0.8.28"
+evm_version = "cancun"
+optimizer = true
+optimizer_runs = 10_000
+via_ir = false
+bytecode_hash = "ipfs"
+cbor_metadata = true
+# Fork tests only run under FOUNDRY_PROFILE=fork (they also skip themselves without POLYGON_RPC_URL).
+no_match_path = "test/fork/**"
+# Compile tests as written. With dynamic test linking, forge 1.8 rewrites `new C(...)` in tests into
+# vm.deployCode(...): try/catch around `new` stops working and `forge coverage` drops the branches of
+# reverting constructors (GaslessBase's InvalidConfig checks).
+dynamic_test_linking = false
+fs_permissions = [
+    { access = "read", path = "./out" },
+    { access = "read-write", path = "./deployments" },
+    { access = "read", path = "./test/vectors/data" },
+]
+
+[profile.default.fuzz]
+runs = 1_000
+seed = "0x6761736c657373"
+
+[profile.default.invariant]
+runs = 256
+depth = 64
+fail_on_revert = false
+
+[profile.fork]
+match_path = "test/fork/**"
+no_match_path = "test/__none__/**"
+
+[profile.invariant-final]
+[profile.invariant-final.fuzz]
+runs = 10_000
+[profile.invariant-final.invariant]
+runs = 2_000
+depth = 128
+fail_on_revert = false
+
+[rpc_endpoints]
+polygon = "${POLYGON_RPC_URL}"
+
+[fmt]
+line_length = 120
+tab_width = 4
+bracket_spacing = false
+int_types = "long"
+quote_style = "double"
+number_underscore = "thousands"
+sort_imports = true

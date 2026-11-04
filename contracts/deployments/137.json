@@ -1,0 +1,40 @@
+{
+  "chainId": 137,
+  "version": "3",
+  "gaslessTransfer": "0x5A3a650fCf35639153aA6bA9aa3e870DAED56199",
+  "initialOwner": "0x682c578E5f07E6A742Fa5C681507c785d3f32256",
+  "deployBlock": "95893586",
+  "tokens": [
+    {
+      "symbol": "USDC",
+      "address": "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
+      "decimals": 6,
+      "authModes": [
+        "permit",
+        "none"
+      ],
+      "domain": {
+        "name": "USD Coin",
+        "version": "2",
+        "chainId": 137,
+        "verifyingContract": "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359"
+      }
+    },
+    {
+      "symbol": "USDT0",
+      "address": "0xc2132D05D31c914a87C6611C10748AEb04B58e8F",
+      "decimals": 6,
+      "authModes": [
+        "permit",
+        "metaTxApprove",
+        "none"
+      ],
+      "domain": {
+        "name": "USDT0",
+        "version": "1",
+        "verifyingContract": "0xc2132D05D31c914a87C6611C10748AEb04B58e8F",
+        "salt": "0x0000000000000000000000000000000000000000000000000000000000000089"
+      }
+    }
+  ]
+}

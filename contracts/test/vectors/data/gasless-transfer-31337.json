@@ -1,0 +1,447 @@
+{
+  "description": "T30 golden vectors, anvil (chain 31337): MockUSDC, MockUSDT0 and GaslessTransfer v3 at the addresses script/DeployLocalStack.s.sol gets on a fresh anvil (account 0, nonces 0-2)",
+  "source": {
+    "contract": "contracts/src/GaslessTransfer.sol",
+    "commit": "0000000000000000000000000000000000000000",
+    "generatedBy": "WRITE_GOLDEN_VECTORS=true GOLDEN_VECTORS_COMMIT=<commit> forge test --match-contract GoldenVectorsWriter"
+  },
+  "chainId": 31337,
+  "verifyingContract": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+  "typeHash": "0x7ab85ade3e686e1c69984c37565b73a20f3bea60cd9870d043cac7acb2d10273",
+  "tokenAuthTypeHash": "0xd2c6df1fc0c41180a4ec92ee33b18dac8247c79ed4d0a933db3cb5a9338acabe",
+  "domainSeparator": "0xe598c52e1091568faffbec259be14f5ab28eaa1539309ca3a7014ae76a84b0f9",
+  "transfers": [
+    {
+      "name": "USDC via permit: amount 1, fee 0, nonce 0",
+      "request": {
+        "token": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+        "from": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+        "to": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+        "amount": "1",
+        "fee": "0",
+        "relay": "0xa0Ee7A142d267C1f36714E4a8F75612F20a79720",
+        "nonce": "0",
+        "deadline": "1790000600"
+      },
+      "authorization": {
+        "mode": "permit",
+        "v": 27,
+        "r": "0x2eae191873bf8dd9249c7c5241eb7812a47ffe9e3a3e541f20f46d179424b0ac",
+        "s": "0x7a0e181df7f3b360504cce125656a6588b841c4088ca2aecd729b02cd4b06000"
+      },
+      "digest": "0x8689e9df75e25af67aa23ef518fcc663af169dd21a17bbaa5e967eca4586807b"
+    },
+    {
+      "name": "USDC via permit: fee 10000, deadline 2^256 - 1, nonce 1",
+      "request": {
+        "token": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+        "from": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+        "to": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+        "amount": "10000000",
+        "fee": "10000",
+        "relay": "0xa0Ee7A142d267C1f36714E4a8F75612F20a79720",
+        "nonce": "1",
+        "deadline": "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+      },
+      "authorization": {
+        "mode": "permit",
+        "v": 28,
+        "r": "0xd747ae9302f8362c72eb7afa311cf352920187059e3b98cf2c93237b0140dc29",
+        "s": "0x0de2567bffba1c5a3c92e88134f81c870c1bc7aed8e94ace3d47db06176d261b"
+      },
+      "digest": "0xcdfa1551ced342d2908b6f5030d4816be521e0eab647c3fa9c2a91caebbc7e12"
+    },
+    {
+      "name": "USDT0 via permit: fee 50000000, nonce 2",
+      "request": {
+        "token": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+        "from": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+        "to": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+        "amount": "250000000",
+        "fee": "50000000",
+        "relay": "0xa0Ee7A142d267C1f36714E4a8F75612F20a79720",
+        "nonce": "2",
+        "deadline": "1790007200"
+      },
+      "authorization": {
+        "mode": "permit",
+        "v": 27,
+        "r": "0xe379d7a701328879105375ddb7d19c7af3495471e0a2eae193eb454a4941643e",
+        "s": "0x5e4d7dca26fc2dc95fb723742190073ed61d0703e9be70f985c619c3547680ce"
+      },
+      "digest": "0xba93623653d8b28aa6ceb679ef000d40d007d74dfb6a2b2f5f22f4e893cf2c1d"
+    },
+    {
+      "name": "USDT0 via meta-tx approve: amount 10000000, fee 50000, nonce 3",
+      "request": {
+        "token": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+        "from": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+        "to": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+        "amount": "10000000",
+        "fee": "50000",
+        "relay": "0xa0Ee7A142d267C1f36714E4a8F75612F20a79720",
+        "nonce": "3",
+        "deadline": "1790001800"
+      },
+      "authorization": {
+        "mode": "metaTxApprove",
+        "v": 28,
+        "r": "0xf3f94876c7ef2d24c00f2db170883fca442e87150064de0f965d535acca75974",
+        "s": "0x594329eba4311e92609cb95889e5050c3a35d99ff15125692cd206081bbe8d2a"
+      },
+      "digest": "0xd2f66b0da8471abeba9e7b6269887c9c87fe20c52990a8e5837f17fa474ab71e"
+    },
+    {
+      "name": "USDC via none (approved beforehand): nonce 4",
+      "request": {
+        "token": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+        "from": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+        "to": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+        "amount": "3000000",
+        "fee": "20000",
+        "relay": "0xa0Ee7A142d267C1f36714E4a8F75612F20a79720",
+        "nonce": "4",
+        "deadline": "1790003600"
+      },
+      "authorization": {
+        "mode": "none",
+        "v": 0,
+        "r": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "s": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "digest": "0x0d133e08addba457915d6b92c168c3b0451628faa5f93215b909fa51c8f8d9f3"
+    },
+    {
+      "name": "USDC: amount 2^256 - 1 - 5000000, fee 5000000, nonce 0",
+      "request": {
+        "token": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+        "from": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+        "to": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+        "amount": "115792089237316195423570985008687907853269984665640564039457584007913124639935",
+        "fee": "5000000",
+        "relay": "0xa0Ee7A142d267C1f36714E4a8F75612F20a79720",
+        "nonce": "0",
+        "deadline": "1790003600"
+      },
+      "authorization": {
+        "mode": "none",
+        "v": 0,
+        "r": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "s": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "digest": "0xfe6ab83b0be080bae7ee2bdd2be79201ac30f2eee0b9fe26e36ddcffaa3fd866"
+    },
+    {
+      "name": "USDT0: amount 2^256 - 1, fee 0, nonce 2^256 - 1",
+      "request": {
+        "token": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+        "from": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+        "to": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+        "amount": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+        "fee": "0",
+        "relay": "0xa0Ee7A142d267C1f36714E4a8F75612F20a79720",
+        "nonce": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+        "deadline": "1790003600"
+      },
+      "authorization": {
+        "mode": "none",
+        "v": 0,
+        "r": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "s": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "digest": "0x349de27ceb6d40c20c666f4cbdd74b2c77e7841b2312f67717641dfd941f92ce"
+    },
+    {
+      "name": "USDC: fee 2^256 - 1 (hashed as signed; relayTransfer reverts on amount + fee above 2^256 - 1)",
+      "request": {
+        "token": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+        "from": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+        "to": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+        "amount": "1",
+        "fee": "115792089237316195423570985008687907853269984665640564039457584007913129639935",
+        "relay": "0xa0Ee7A142d267C1f36714E4a8F75612F20a79720",
+        "nonce": "7",
+        "deadline": "1790003600"
+      },
+      "authorization": {
+        "mode": "permit",
+        "v": 27,
+        "r": "0x276cecc5706da325b10d26ca150fed50b4bd36e680392ea1afdde2b9370f159d",
+        "s": "0x58455011eb3c551d6be695b6b93f5ce707a2e81e78e7fafc2a473124d6538b36"
+      },
+      "digest": "0x19e36a8b2000d6c83e86b54f15223726858c56ab378f29875ba534dbab8d7b50"
+    },
+    {
+      "name": "USDC: deadline 0",
+      "request": {
+        "token": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+        "from": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+        "to": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+        "amount": "5000000",
+        "fee": "20000",
+        "relay": "0xa0Ee7A142d267C1f36714E4a8F75612F20a79720",
+        "nonce": "1",
+        "deadline": "0"
+      },
+      "authorization": {
+        "mode": "none",
+        "v": 0,
+        "r": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "s": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "digest": "0xf89234421b37272d7ae261b58b736d515d35d7ec87c41795ad9867aa94683144"
+    },
+    {
+      "name": "USDT0 via meta-tx approve, v 28, nonce 2^32 - 1",
+      "request": {
+        "token": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+        "from": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+        "to": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+        "amount": "5000000",
+        "fee": "20000",
+        "relay": "0xa0Ee7A142d267C1f36714E4a8F75612F20a79720",
+        "nonce": "4294967295",
+        "deadline": "1790003600"
+      },
+      "authorization": {
+        "mode": "metaTxApprove",
+        "v": 28,
+        "r": "0x2d23c32b569679a2566bf1d354a2de887f5445472ede1a92d7a427da22231168",
+        "s": "0x0ecc6670477193141402547863521bd9dc8afba74cdfcaa762fade7837fdb166"
+      },
+      "digest": "0xf257b8be9c5242dc31a17dfd37d4950e12eaea6b3a3f4edaead1c5f14d916437"
+    },
+    {
+      "name": "NONE with non-zero v, r, s: hashed as given",
+      "request": {
+        "token": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+        "from": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+        "to": "0x3C44CdDdB6a900fa2b585dd299e03d12FA4293BC",
+        "amount": "5000000",
+        "fee": "20000",
+        "relay": "0xa0Ee7A142d267C1f36714E4a8F75612F20a79720",
+        "nonce": "0",
+        "deadline": "1790003600"
+      },
+      "authorization": {
+        "mode": "none",
+        "v": 27,
+        "r": "0x8a52651e3557af3fc35a7a11226347a1ca6b44ab38025cd9193b91aef392650d",
+        "s": "0x51fa35d5842da59c84510eacd54c963df8ffd5d23ef655ab57df1adabc839487"
+      },
+      "digest": "0x9794f62d9b3e3ed471b0d4ed3f78b3fa086ea7e32924942ff01b8afd3389fc43"
+    },
+    {
+      "name": "USDC to the USDT0 token contract",
+      "request": {
+        "token": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+        "from": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+        "to": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+        "amount": "3000000",
+        "fee": "20000",
+        "relay": "0xa0Ee7A142d267C1f36714E4a8F75612F20a79720",
+        "nonce": "5",
+        "deadline": "1790003600"
+      },
+      "authorization": {
+        "mode": "none",
+        "v": 0,
+        "r": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "s": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "digest": "0x2c827872185a6f252263dd21a204cd5fbd46850f0857664e0ec5b7330ea798b9"
+    },
+    {
+      "name": "USDT0 to the USDC token contract",
+      "request": {
+        "token": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+        "from": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+        "to": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+        "amount": "3000000",
+        "fee": "20000",
+        "relay": "0xa0Ee7A142d267C1f36714E4a8F75612F20a79720",
+        "nonce": "5",
+        "deadline": "1790003600"
+      },
+      "authorization": {
+        "mode": "none",
+        "v": 0,
+        "r": "0x0000000000000000000000000000000000000000000000000000000000000000",
+        "s": "0x0000000000000000000000000000000000000000000000000000000000000000"
+      },
+      "digest": "0x349a9e9921ded593a2ba77971248726adb15ed5f45b6006c2230ee114897ce52"
+    },
+    {
+      "name": "USDT0: from, to and relay with leading zero bytes",
+      "request": {
+        "token": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+        "from": "0x000000000000000000000000000000000000dEaD",
+        "to": "0x00000000000000000000000000000000000A11cE",
+        "amount": "1234567",
+        "fee": "10000",
+        "relay": "0x0000000000000000000000000000000000000B0b",
+        "nonce": "9",
+        "deadline": "1790003600"
+      },
+      "authorization": {
+        "mode": "permit",
+        "v": 27,
+        "r": "0x276cecc5706da325b10d26ca150fed50b4bd36e680392ea1afdde2b9370f159d",
+        "s": "0x58455011eb3c551d6be695b6b93f5ce707a2e81e78e7fafc2a473124d6538b36"
+      },
+      "digest": "0x909952d2a658614e3ec9fbc5565ddf35a4a180d23c0db667fa54cad92098c105"
+    },
+    {
+      "name": "USDT0 via meta-tx approve: amount 10000000, fee 50000, nonce 3, all addresses lowercase",
+      "request": {
+        "token": "0xe7f1725e7734ce288f8367e1bb143e90bb3f0512",
+        "from": "0x70997970c51812dc3a010c7d01b50e0d17dc79c8",
+        "to": "0x3c44cdddb6a900fa2b585dd299e03d12fa4293bc",
+        "amount": "10000000",
+        "fee": "50000",
+        "relay": "0xa0ee7a142d267c1f36714e4a8f75612f20a79720",
+        "nonce": "3",
+        "deadline": "1790001800"
+      },
+      "authorization": {
+        "mode": "metaTxApprove",
+        "v": 28,
+        "r": "0xf3f94876c7ef2d24c00f2db170883fca442e87150064de0f965d535acca75974",
+        "s": "0x594329eba4311e92609cb95889e5050c3a35d99ff15125692cd206081bbe8d2a"
+      },
+      "digest": "0xd2f66b0da8471abeba9e7b6269887c9c87fe20c52990a8e5837f17fa474ab71e"
+    },
+    {
+      "name": "pseudo-random #1",
+      "request": {
+        "token": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+        "from": "0x858dB57f817B4AA1540f1a2A5C74Ea4Dc4CB5E5a",
+        "to": "0x1ebD63531e9e79caE98B585c986ec27c41dD1A25",
+        "amount": "722115914397408",
+        "fee": "1318091",
+        "relay": "0x8121f96FaB62d2f6170A4c3C4f7fe4bE1CcdA829",
+        "nonce": "74274085117501666120102062635321303513109470439890957194942386097239221009460",
+        "deadline": "1790003707"
+      },
+      "authorization": {
+        "mode": "none",
+        "v": 92,
+        "r": "0x02a9d2f49e827479af60de0ff50dde42bfe3b66f363bd3bc5ce3153d7ab03b1e",
+        "s": "0xe3fc429460d8d5659177208a2bcfb971d98f195b5dc9ba7cee57a7ec53476640"
+      },
+      "digest": "0x2e035c1656bb530c0fbe72de193fd9e604168683284f3879b77794f0b2a41cd8"
+    },
+    {
+      "name": "pseudo-random #2",
+      "request": {
+        "token": "0x5FbDB2315678afecb367f032d93F642f64180aa3",
+        "from": "0x93b5DE865302b6fAe0833DBa489bB846f295152e",
+        "to": "0x5De446d072CceFBAd521d505E130fd70a708b336",
+        "amount": "203716676609431",
+        "fee": "1475348",
+        "relay": "0xfcd23D9b24Dd3451Bc4F3Fc0E505e6E89E25B065",
+        "nonce": "33613510965839688231842109400219390066064587594552193986777683008875352034858",
+        "deadline": "1790003277"
+      },
+      "authorization": {
+        "mode": "none",
+        "v": 209,
+        "r": "0xdd343dae143265b789df7db03b38fc2c4f850d0c4f8e80569a90b9a18a2a321a",
+        "s": "0x1c5b3147317e1cd376c654e968c2fe6493d9d13c494f27ceed16cdd4dd52ab8d"
+      },
+      "digest": "0xe8d929b07036baee7e196ccbfba9b8e2b67ec034f239242ce627c0640a56cf03"
+    },
+    {
+      "name": "pseudo-random #3",
+      "request": {
+        "token": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+        "from": "0x57d51b24a9ee2AFA952b62DFaa572582B1940B2D",
+        "to": "0xD981D6a87d7EB03E5A0501AB09cd8Ca1530D9181",
+        "amount": "852591030954297",
+        "fee": "2695698",
+        "relay": "0x5f833688bBf3497d68c8204395f8A64d499D1163",
+        "nonce": "79875242498834426642236516428247997940150546232980461351155404796975620302515",
+        "deadline": "1790002576"
+      },
+      "authorization": {
+        "mode": "metaTxApprove",
+        "v": 126,
+        "r": "0x07e05d5419c8b4de3c38af75c2170d2786ed8bf23664bc368dea7a1dae741de2",
+        "s": "0x3a0ba92eba797726c5f8dee63c893d8376df0c8332c198960f50c1daec33c66a"
+      },
+      "digest": "0x84aca63af57e25a17786f7c2cdd34eb5cd96d3594e539768e054a9b4f0debdc7"
+    }
+  ],
+  "tokenAuthorizations": [
+    {
+      "name": "USDC permit, nonce 0, for 'USDC via permit: amount 1, fee 0, nonce 0'",
+      "kind": "permit",
+      "domain": {
+        "name": "USD Coin",
+        "version": "2",
+        "chainId": 31337,
+        "verifyingContract": "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+      },
+      "message": {
+        "owner": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+        "spender": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+        "value": "1",
+        "nonce": "0",
+        "deadline": "1790000600"
+      },
+      "digest": "0xbf9d5cc149189a653e7d416e1427d7ea52ee42f3e1df39c02125fd2d12ecf0fb"
+    },
+    {
+      "name": "USDC permit, nonce 1, for 'USDC via permit: fee 10000, deadline 2^256 - 1, nonce 1'",
+      "kind": "permit",
+      "domain": {
+        "name": "USD Coin",
+        "version": "2",
+        "chainId": 31337,
+        "verifyingContract": "0x5FbDB2315678afecb367f032d93F642f64180aa3"
+      },
+      "message": {
+        "owner": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+        "spender": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+        "value": "10010000",
+        "nonce": "1",
+        "deadline": "115792089237316195423570985008687907853269984665640564039457584007913129639935"
+      },
+      "digest": "0x6ef20051794c126bfcdac864a048accd1b7bf89bf91154e967a018b06080c6ba"
+    },
+    {
+      "name": "USDT0 permit, nonce 0, for 'USDT0 via permit: fee 50000000, nonce 2'",
+      "kind": "permit",
+      "domain": {
+        "name": "USDT0",
+        "version": "1",
+        "verifyingContract": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+        "salt": "0x0000000000000000000000000000000000000000000000000000000000007a69"
+      },
+      "message": {
+        "owner": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+        "spender": "0x9fE46736679d2D9a65F0992F2272dE9f3c7fa6e0",
+        "value": "300000000",
+        "nonce": "0",
+        "deadline": "1790007200"
+      },
+      "digest": "0xae315b3b7b2c96805cbf201f7cedc973494d0e6998e9dcdaf7662c6d9dcbb75a"
+    },
+    {
+      "name": "USDT0 meta-tx approve, nonce 1, for 'USDT0 via meta-tx approve: amount 10000000, fee 50000, nonce 3'",
+      "kind": "metaTxApprove",
+      "domain": {
+        "name": "USDT0",
+        "version": "1",
+        "verifyingContract": "0xe7f1725E7734CE288F8367e1Bb143E90bb3F0512",
+        "salt": "0x0000000000000000000000000000000000000000000000000000000000007a69"
+      },
+      "message": {
+        "nonce": "1",
+        "from": "0x70997970C51812dc3A010C7d01b50e0d17dc79C8",
+        "functionSignature": "0x095ea7b30000000000000000000000009fe46736679d2d9a65f0992f2272de9f3c7fa6e000000000000000000000000000000000000000000000000000000000009959d0"
+      },
+      "digest": "0x7ddc91984fb94b400ad60204567b57bfa42831726c971e89e1efd0b5bd65b4e8"
+    }
+  ]
+}

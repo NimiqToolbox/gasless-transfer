@@ -1,0 +1,5 @@
+# deployments/<chainId>.json is written by the deploy scripts (script/DeploymentWriter.sol) and read by off-chain
+# clients. The records of public chains (Polygon 137, the Amoy test deployment 80002) are committed. Only local
+# deployments stay out of git: the anvil stack (31337) and the deploy-script tests (deployments/test/).
+deployments/31337.json
+deployments/test/
