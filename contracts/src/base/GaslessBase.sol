@@ -68,6 +68,9 @@ abstract contract GaslessBase is IGaslessBase, EIP712, ReentrancyGuardTransient,
 
     /// @dev An enabled configuration needs a token with code (which excludes address(0)) other than this contract. A
     ///      configuration without any mode removes the token, for any address.
+    /// @param token The token whose configuration is set.
+    /// @param config The new configuration. Reverts with InvalidConfig if it enables a mode and `token` has no code or
+    ///        is this contract.
     // Also called in the constructor's loop, where any bad entry must abort the deployment.
     // forge-lint: disable-next-item(require-revert-in-loop)
     function _setTokenConfig(address token, TokenConfig memory config) private {
@@ -84,6 +87,8 @@ abstract contract GaslessBase is IGaslessBase, EIP712, ReentrancyGuardTransient,
     }
 
     /// @dev Reads the token's configuration once and checks that `mode` is enabled for it.
+    /// @param token The token of the request. Reverts with TokenNotSupported if it has no mode enabled.
+    /// @param mode The auth mode of the request. Reverts with AuthModeNotSupported if `token` does not enable it.
     function _requireToken(address token, AuthMode mode) internal view {
         TokenConfig memory config = _tokenConfigs[token];
         bool enabled;
@@ -107,6 +112,7 @@ abstract contract GaslessBase is IGaslessBase, EIP712, ReentrancyGuardTransient,
     }
 
     /// @dev Deadlines are unix seconds (D3); validator timestamp drift is negligible against the 60 s to 2 h window.
+    /// @param deadline The last second at which the request may execute. Reverts with DeadlineExpired after it.
     function _checkDeadline(uint256 deadline) internal view {
         // forge-lint: disable-next-line(block-timestamp)
         if (block.timestamp > deadline) revert DeadlineExpired(deadline);
@@ -114,6 +120,11 @@ abstract contract GaslessBase is IGaslessBase, EIP712, ReentrancyGuardTransient,
 
     /// @dev ECDSA only (no ERC-1271): tryRecoverCalldata accepts only 65-byte signatures and rejects high-s values; it
     ///      reads the signature from calldata without copying it to memory.
+    /// @param signer The account that must have signed the request (its `from`). Reverts with InvalidSigner if it is
+    ///        address(0).
+    /// @param structHash The EIP-712 struct hash of the request; it is hashed with this contract's domain separator.
+    /// @param sig The 65-byte ECDSA signature (r, s, v). Reverts with InvalidSignature if it is malformed or `signer`
+    ///        did not make it.
     function _verify(address signer, bytes32 structHash, bytes calldata sig) internal view {
         if (signer == address(0)) revert InvalidSigner();
         (address recovered, ECDSA.RecoverError err,) = ECDSA.tryRecoverCalldata(_hashTypedDataV4(structHash), sig);

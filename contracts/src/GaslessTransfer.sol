@@ -80,6 +80,14 @@ contract GaslessTransfer is IGaslessTransfer, GaslessBase {
     /// @dev Callers must have verified `from`'s signature over token, to, amount, fee, relay and auth in the same call
     ///      (P1); that signature is what justifies both transferFrom calls below. The fee goes first (D13), which only
     ///      affects the order of the Transfer logs: the whole call is atomic.
+    /// @param token The token to move.
+    /// @param from The sender who signed the request; both transfers pull from it.
+    /// @param to The recipient of `amount`.
+    /// @param amount The amount that `to` receives.
+    /// @param fee The fee that `relay` receives; 0 skips the fee transfer.
+    /// @param relay The relay that the request names and that submits it.
+    /// @param deadline The request deadline; PERMIT mode uses it as the permit deadline.
+    /// @param auth The token authorization signed into the request.
     function _collect(
         address token,
         address from,
