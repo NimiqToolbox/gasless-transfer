@@ -34,7 +34,7 @@ abstract contract GaslessBase is IGaslessBase, EIP712, ReentrancyGuardTransient,
         Ownable(initialOwner)
     {
         if (tokens.length == 0) revert InvalidConfig();
-        for (uint256 i = 0; i < tokens.length; ++i) {
+        for (uint256 i; i < tokens.length; ++i) {
             TokenInit memory t = tokens[i];
             // Each initial token is enabled once; a disabling or repeated entry is a deployment mistake.
             if (!_enabled(t.config) || _enabled(_tokenConfigs[t.token])) revert InvalidConfig();
