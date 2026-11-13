@@ -22,6 +22,7 @@ contract GaslessTransfer is IGaslessTransfer, GaslessBase {
             TOKEN_AUTH_TYPE
         )
     );
+    /// @inheritdoc IGaslessTransfer
     bytes32 public constant TRANSFER_TYPEHASH = keccak256(bytes(TRANSFER_TYPE));
 
     constructor(address initialOwner, TokenInit[] memory tokens)
@@ -59,6 +60,12 @@ contract GaslessTransfer is IGaslessTransfer, GaslessBase {
         return _hashTypedDataV4(_hashStruct(r, nonce, auth));
     }
 
+    /// @dev The EIP-712 struct hash of `r` at `nonce` with `auth`, encoded as TRANSFER_TYPE defines it: the TokenAuth
+    ///      member is encoded as the hash of its own struct (TOKEN_AUTH_TYPEHASH).
+    /// @param r The transfer request.
+    /// @param nonce The nonce the request is signed at; relayTransfer passes nonces(r.from).
+    /// @param auth The token authorization signed into the request.
+    /// @return The struct hash; _hashTypedDataV4 turns it into the digest that `from` signs.
     function _hashStruct(TransferRequest calldata r, uint256 nonce, TokenAuth calldata auth)
         private
         pure

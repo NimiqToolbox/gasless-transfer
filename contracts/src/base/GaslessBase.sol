@@ -18,6 +18,7 @@ abstract contract GaslessBase is IGaslessBase, EIP712, ReentrancyGuardTransient,
     /// @notice The EIP-712 type of the token authorization (TokenAuth). A signed request type that carries one lists it
     ///         among its referenced struct types, which EIP-712 appends to the primary type sorted by name.
     string public constant TOKEN_AUTH_TYPE = "TokenAuth(uint8 mode,uint8 v,bytes32 r,bytes32 s)";
+    /// @inheritdoc IGaslessBase
     bytes32 public constant TOKEN_AUTH_TYPEHASH = keccak256(bytes(TOKEN_AUTH_TYPE));
 
     /// @dev Upper bound of one nonce increase, so that a single mistaken call cannot use up the nonce space.
@@ -42,10 +43,12 @@ abstract contract GaslessBase is IGaslessBase, EIP712, ReentrancyGuardTransient,
         }
     }
 
+    /// @inheritdoc IGaslessBase
     function tokenConfig(address token) external view returns (TokenConfig memory) {
         return _tokenConfigs[token];
     }
 
+    /// @inheritdoc IGaslessBase
     function DOMAIN_SEPARATOR() external view returns (bytes32) {
         return _domainSeparatorV4();
     }
@@ -73,6 +76,9 @@ abstract contract GaslessBase is IGaslessBase, EIP712, ReentrancyGuardTransient,
         emit TokenConfigSet(token, config);
     }
 
+    /// @dev Whether `config` enables any auth mode, that is, whether its token is supported.
+    /// @param config The token configuration to check.
+    /// @return True if at least one of permit, metaTxApprove and allowance is set.
     function _enabled(TokenConfig memory config) private pure returns (bool) {
         return config.permit || config.metaTxApprove || config.allowance;
     }
@@ -94,6 +100,8 @@ abstract contract GaslessBase is IGaslessBase, EIP712, ReentrancyGuardTransient,
         }
     }
 
+    /// @dev Only the relay that `from` signed may submit a request (D5); it also receives the fee.
+    /// @param relay The relay of the signed request. Reverts with NotRelay unless it is msg.sender.
     function _requireRelay(address relay) internal view {
         if (msg.sender != relay) revert NotRelay(msg.sender, relay);
     }
