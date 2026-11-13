@@ -255,12 +255,16 @@ An ephemeral key can hold tokens. It signs a `GaslessTransfer` of `balance − f
 
 **A broadcast META_TX stays public**. Once broadcast, a META_TX is public for good, whatever the outcome. If the call reverts or is cancelled, anyone can still execute it later. That creates an allowance of `amount + fee` for this contract, which moves nothing without a new intent signature but uses up the nonce. Clients should therefore prefer PERMIT for USDT0, whose deadline is the intent deadline, and use META_TX_APPROVE only for a token without permit, or when the caller explicitly asks for it.
 
-**EIP-7702-delegated EOAs**. USDC verifies permits of accounts with code through ERC-1271 of the account's delegate, not ECDSA, so whether such a permit works depends on the delegate:
-- It fails for delegates without ERC-1271.
+**Accounts with code**. The contract verifies the intent signature with ECDSA against `from`, never ERC-1271 (D1). USDC verifies the permit of an account with code (a smart-contract account or an EIP-7702-delegated EOA) through ERC-1271 and never falls back to ECDSA. The two signatures of one USDC PERMIT request are then verified under different schemes, and USDC decides by the code of `from` when the request executes, not when it was signed:
+
+**EIP-7702-delegated EOAs**. The account's key signs the intent. Whether its USDC permit works depends on the delegate:
+- It fails for delegates without ERC-1271. The permit call fails and the transfer reverts with `InsufficientAllowance`, unless exactly `amount + fee` is already approved (§4.1). This also applies to a request signed before the delegation was set.
 - It succeeds for delegates that accept the account's key.
 - A permissive delegate even accepts permits nobody signed. P1 still holds, because the intent signature is ECDSA.
 
-Clients should not sign USDC permits for accounts with code unless the caller explicitly allows them, and should suggest a one-time approval plus NONE mode instead.
+**Smart-contract accounts**. They can produce a USDC permit that USDC accepts through ERC-1271, but they cannot sign an intent: every request with a contract as `from` reverts with `InvalidSignature` (T28). Contract accounts are not supported.
+
+Clients must check for code at `from` before they offer PERMIT for USDC. They should not sign USDC permits for accounts with code unless the caller explicitly allows them, and should suggest a one-time approval plus NONE mode instead. A USDC PERMIT request whose account got code after signing is replaced the same way: a one-time approval, then a new NONE request at the same nonce.
 
 USDT0 verifies permits and meta-txs with `ecrecover`, so 7702 accounts can use both.
 
