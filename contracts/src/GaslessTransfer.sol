@@ -35,7 +35,8 @@ contract GaslessTransfer is IGaslessTransfer, GaslessBase {
         // The signature first (§4.3): nothing else is checked or called for a request that `from` did not sign, with
         // this token authorization, at its current nonce.
         uint256 nonce = nonces[r.from];
-        _verify(r.from, _hashStruct(r, nonce, auth), signature);
+        bytes32 structHash = _hashStruct(r, nonce, auth);
+        _verify(r.from, structHash, signature);
 
         // Checks.
         _requireToken(r.token, auth.mode);
@@ -49,6 +50,11 @@ contract GaslessTransfer is IGaslessTransfer, GaslessBase {
 
         // Interactions; nonReentrant guards the whole call.
         _collect(r.token, r.from, r.to, r.amount, r.fee, r.relay, r.deadline, auth);
+
+        // Logged after the token logs, with the request id of the executed request. nonReentrant guards the whole
+        // call: during the token calls no other TransferRelayed can be emitted, so no log can be reordered or forged.
+        // forge-lint: disable-next-line(reentrancy-events)
+        emit TransferRelayed(r.from, nonce, _hashTypedDataV4(structHash));
     }
 
     function hashTransfer(TransferRequest calldata r, uint256 nonce, TokenAuth calldata auth)

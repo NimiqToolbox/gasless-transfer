@@ -10,7 +10,7 @@ import {SpecBase} from "./SpecBase.sol";
 import {MockFalseReturnToken, MockNoReturnToken, MockReentrantToken} from "./mocks/MockEdgeTokens.sol";
 
 /// @notice Token behaviour and events: T22-T24 on mocks and the exact log order of §4.3 (D13 "fee first"; the
-///         contract itself emits no event for a transfer).
+///         contract's only event for a transfer, TransferRelayed, comes last).
 contract TokenBehaviourSpecTest is SpecBase {
     bytes32 internal constant TRANSFER_EVENT = keccak256("Transfer(address,address,uint256)");
     bytes32 internal constant APPROVAL_EVENT = keccak256("Approval(address,address,uint256)");
@@ -217,14 +217,15 @@ contract TokenBehaviourSpecTest is SpecBase {
     // ================================================================ §4.3 log order (D13)
 
     /// @notice §4.3 log order, USDC PERMIT: permit Approval, Transfer(from -> relay, fee), Transfer(from -> to,
-    ///         amount). Nothing else is emitted.
+    ///         amount), TransferRelayed(from, nonce, digest). Nothing else is emitted.
     function test_logOrder_usdcPermit() public {
         TransferRequest memory r = request(address(usdc), alice);
         TokenAuth memory auth = authorize(aliceKey, r, AuthMode.PERMIT);
-        ExpectedLog[] memory e = new ExpectedLog[](3);
+        ExpectedLog[] memory e = new ExpectedLog[](4);
         e[0] = _approval(address(usdc), alice, address(gasless), r.amount + r.fee);
         e[1] = _transfer(address(usdc), alice, relay, r.fee);
         e[2] = _transfer(address(usdc), alice, carol, r.amount);
+        e[3] = _transferRelayed(r, auth);
         _submitAndCheckLogs(r, signRequest(aliceKey, r, auth), auth, e);
     }
 
@@ -233,9 +234,10 @@ contract TokenBehaviourSpecTest is SpecBase {
         TransferRequest memory r = request(address(usdc), alice);
         r.fee = 0;
         TokenAuth memory auth = authorize(aliceKey, r, AuthMode.PERMIT);
-        ExpectedLog[] memory e = new ExpectedLog[](2);
+        ExpectedLog[] memory e = new ExpectedLog[](3);
         e[0] = _approval(address(usdc), alice, address(gasless), r.amount);
         e[1] = _transfer(address(usdc), alice, carol, r.amount);
+        e[2] = _transferRelayed(r, auth);
         _submitAndCheckLogs(r, signRequest(aliceKey, r, auth), auth, e);
     }
 
@@ -243,9 +245,10 @@ contract TokenBehaviourSpecTest is SpecBase {
     function test_logOrder_usdcNone() public {
         TransferRequest memory r = request(address(usdc), alice);
         TokenAuth memory auth = authorize(aliceKey, r, AuthMode.NONE);
-        ExpectedLog[] memory e = new ExpectedLog[](2);
+        ExpectedLog[] memory e = new ExpectedLog[](3);
         e[0] = _transfer(address(usdc), alice, relay, r.fee);
         e[1] = _transfer(address(usdc), alice, carol, r.amount);
+        e[2] = _transferRelayed(r, auth);
         _submitAndCheckLogs(r, signRequest(aliceKey, r, auth), auth, e);
     }
 
@@ -254,34 +257,37 @@ contract TokenBehaviourSpecTest is SpecBase {
     function test_logOrder_usdt0Permit() public {
         TransferRequest memory r = request(address(usdt), alice);
         TokenAuth memory auth = authorize(aliceKey, r, AuthMode.PERMIT);
-        ExpectedLog[] memory e = new ExpectedLog[](5);
+        ExpectedLog[] memory e = new ExpectedLog[](6);
         e[0] = _approval(address(usdt), alice, address(gasless), r.amount + r.fee);
         e[1] = _transfer(address(usdt), alice, relay, r.fee);
         e[2] = _approval(address(usdt), alice, address(gasless), r.amount);
         e[3] = _transfer(address(usdt), alice, carol, r.amount);
         e[4] = _approval(address(usdt), alice, address(gasless), 0);
+        e[5] = _transferRelayed(r, auth);
         _submitAndCheckLogs(r, signRequest(aliceKey, r, auth), auth, e);
     }
 
     /// @notice §4.3 log order, USDT0 META_TX_APPROVE: the meta-tx (spender = this contract, value = amount + fee)
-    ///         and its Approval come first, then fee and principal.
+    ///         and its Approval come first, then fee and principal, then TransferRelayed.
     function test_logOrder_usdt0MetaTx() public {
         TransferRequest memory r = request(address(usdt), alice);
         TokenAuth memory auth = authorize(aliceKey, r, AuthMode.META_TX_APPROVE);
-        ExpectedLog[] memory e = new ExpectedLog[](6);
+        ExpectedLog[] memory e = new ExpectedLog[](7);
         e[0] = _metaTxExecuted(alice, address(gasless), approveCalldata(address(gasless), r.amount + r.fee));
         e[1] = _approval(address(usdt), alice, address(gasless), r.amount + r.fee);
         e[2] = _transfer(address(usdt), alice, relay, r.fee);
         e[3] = _approval(address(usdt), alice, address(gasless), r.amount);
         e[4] = _transfer(address(usdt), alice, carol, r.amount);
         e[5] = _approval(address(usdt), alice, address(gasless), 0);
+        e[6] = _transferRelayed(r, auth);
         _submitAndCheckLogs(r, signRequest(aliceKey, r, auth), auth, e);
     }
 
     /// @notice §4.3 log order (fuzz), all routes: after dropping USDT0's own events (MetaTransactionExecuted, and the
     ///         allowance-bookkeeping Approval that follows each of its Transfers), the log sequence is exactly
-    ///         [authorization Approval if not NONE] [fee Transfer if fee > 0] [principal Transfer], the principal
-    ///         Transfer is the last one, and GaslessTransfer emits nothing.
+    ///         [authorization Approval if not NONE] [fee Transfer if fee > 0] [principal Transfer] [TransferRelayed],
+    ///         the principal Transfer is the last Transfer, and TransferRelayed, the contract's only event, is the last
+    ///         log of the call.
     function testFuzz_logOrder_section43(uint256 routeSeed, uint256 amount, uint256 fee) public {
         (address token, AuthMode mode) = route(routeSeed);
         TransferRequest memory r = request(token, alice);
@@ -289,30 +295,33 @@ contract TokenBehaviourSpecTest is SpecBase {
         r.fee = bound(fee, 0, MAX_TEST_FEE);
         TokenAuth memory auth = authorize(aliceKey, r, mode);
         bytes memory sig = signRequest(aliceKey, r, auth);
+        ExpectedLog memory relayed = _transferRelayed(r, auth);
 
         vm.recordLogs();
         submit(r, sig, auth);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
-        ExpectedLog[] memory e = new ExpectedLog[](3);
+        ExpectedLog[] memory e = new ExpectedLog[](4);
         uint256 n;
         if (mode != AuthMode.NONE) e[n++] = _approval(token, alice, address(gasless), r.amount + r.fee);
         if (r.fee > 0) e[n++] = _transfer(token, alice, relay, r.fee);
         e[n++] = _transfer(token, alice, carol, r.amount);
+        e[n++] = relayed;
 
         uint256 k;
-        uint256 last;
+        uint256 lastTransfer;
         for (uint256 i = 0; i < logs.length; ++i) {
-            assertTrue(logs[i].emitter != address(gasless), "GaslessTransfer emitted an event");
             if (_isUsdt0Bookkeeping(logs, i)) continue;
             assertLt(k, n, "unexpected extra log");
             _assertLog(logs[i], e[k], k);
+            if (logs[i].topics[0] == TRANSFER_EVENT) lastTransfer = i;
             ++k;
-            last = i;
         }
         assertEq(k, n, "missing log");
-        assertEq(logs[last].topics[0], TRANSFER_EVENT, "the principal Transfer is not the last log");
-        assertEq(address(uint160(uint256(logs[last].topics[2]))), carol, "the last Transfer is not the principal");
+        assertEq(logs[logs.length - 1].emitter, address(gasless), "TransferRelayed is not the last log");
+        assertEq(
+            address(uint160(uint256(logs[lastTransfer].topics[2]))), carol, "the last Transfer is not the principal"
+        );
     }
 
     // ================================================================ helpers
@@ -365,6 +374,22 @@ contract TokenBehaviourSpecTest is SpecBase {
         t[0] = a;
         t[1] = bytes32(uint256(uint160(b)));
         t[2] = bytes32(uint256(uint160(c)));
+    }
+
+    /// @dev TransferRelayed(from, nonce, digest) for `r` at the current nonce of `r.from`, with the spec's digest; call
+    ///      it before the submission uses that nonce.
+    function _transferRelayed(TransferRequest memory r, TokenAuth memory auth)
+        internal
+        view
+        returns (ExpectedLog memory)
+    {
+        uint256 nonce = gasless.nonces(r.from);
+        bytes32[] memory t = new bytes32[](4);
+        t[0] = IGaslessTransfer.TransferRelayed.selector;
+        t[1] = bytes32(uint256(uint160(r.from)));
+        t[2] = bytes32(nonce);
+        t[3] = digest(r, nonce, auth);
+        return ExpectedLog(address(gasless), t, "");
     }
 
     function _transfer(address token, address from, address to, uint256 value)

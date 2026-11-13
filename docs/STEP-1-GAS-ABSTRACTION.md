@@ -28,7 +28,7 @@ Signed field order, EIP-712 domains and the ABI are compatibility boundaries. Ch
 | D6 | Each token has a configuration: its allowed auth modes. The constructor sets the initial tokens. The owner (`Ownable2Step`, a non-zero constructor argument) adds a token, replaces its configuration or removes it with `setTokenConfig`, which emits `TokenConfigSet`. The owner has no other power: it cannot move tokens, change nonces or alter a signed request. A configuration change can make a signed request fail, and it can make executable a signed request that the previous configuration refused (by adding its token or mode): a signed request stays valid until its nonce is used or its deadline passes, whatever the configuration. The contract sets no fee bound: the fee is what `from` signs, in the token's own units. The relay's quote is a hint; the client must show the fee to the user and check it before signing. `renounceOwnership` freezes the configuration. |
 | D10 | One `GaslessTransfer` covers the token type "ERC-20 stablecoin" (USDC and USDT0). |
 | D11 | The contract rejects `to` ∈ {0, token, this}. |
-| D13 | Fee first: the fee transfer to the relay executes before the principal transfer, within the same atomic call. This only affects the order of `Transfer` logs; the principal is the last one. The contract emits no event of its own for a transfer. |
+| D13 | Fee first: the fee transfer to the relay executes before the principal transfer, within the same atomic call. This only affects the order of `Transfer` logs; the principal is the last one. After the principal transfer, the contract emits `TransferRelayed(from, nonce, digest)`, its only event for a transfer and the last log of the call (§4.3). |
 
 ---
 
@@ -172,6 +172,9 @@ string public constant TRANSFER_TYPE = string(abi.encodePacked("GaslessTransfer(
 bytes32 public constant TRANSFER_TYPEHASH = keccak256(bytes(TRANSFER_TYPE));
 // TOKEN_AUTH_TYPE and TOKEN_AUTH_TYPEHASH come from GaslessBase (§4.2)
 
+event TransferRelayed(address indexed from, uint256 indexed nonce, bytes32 indexed digest);
+    // relayTransfer executed the request of `from` at `nonce`; digest = hashTransfer(r, nonce, auth)
+
 constructor(address initialOwner, TokenInit[] memory tokens) GaslessBase("Nimiq Gasless Transfer", initialOwner, tokens);
 function relayTransfer(TransferRequest calldata r, bytes calldata signature, TokenAuth calldata auth) external nonReentrant;
 function hashTransfer(TransferRequest calldata r, uint256 nonce, TokenAuth calldata auth) external view returns (bytes32);
@@ -207,20 +210,27 @@ Interactions:
 
 7. `_collect(r.token, r.from, r.to, r.amount, r.fee, r.relay, r.deadline, auth)`
 
+Event, after the token transfers:
+
+8. `emit TransferRelayed(r.from, nonce, digest)` with `digest = hashTransfer(r, nonce, auth)`
+
 A request signed for another nonce, or submitted with another token authorization, fails at step 1 with `InvalidSignature`; the contract cannot tell it from a forged one. A request whose `amount + fee` exceeds 2^256 − 1 reverts in step 7 before any token call. A reverted call leaves the nonce unchanged.
 
 Log order. Guaranteed, in this order:
 1. The token authorization's logs, if this call executes the token authorization (PERMIT and META_TX_APPROVE only). They are absent when the permit or meta-tx was executed before (front-run, T13–T15) or is otherwise no longer valid, and the call is then paid from exactly `amount + fee` already in place. An allowance of exactly `amount + fee` does not skip a valid token authorization: it still executes and logs.
 2. `Transfer(from → relay, fee)`, only if `fee > 0`.
 3. `Transfer(from → to, amount)`, the last `Transfer` log of the call.
+4. `TransferRelayed(from, nonce, digest)` from `GaslessTransfer`, the last log of the call.
 
-`GaslessTransfer` itself emits nothing. Tokens emit further events in between, so consumers filter by emitter and topic:
-- **USDC:** PERMIT emits `Approval`, `Transfer` (fee), `Transfer` (amount). NONE emits the same without the `Approval`, and so does a PERMIT call whose permit was executed before.
+`TransferRelayed` is the only event `GaslessTransfer` emits for a transfer. Tokens emit further events in between, so consumers filter by emitter and topic:
+- **USDC:** PERMIT emits `Approval`, `Transfer` (fee), `Transfer` (amount), `TransferRelayed`. NONE emits the same without the `Approval`, and so does a PERMIT call whose permit was executed before.
 - **USDT0:** every `transferFrom` also emits an `Approval` with the reduced allowance, and `executeMetaTransaction` emits `MetaTransactionExecuted` before the meta-tx `Approval`.
-  - A META_TX_APPROVE call with a fee therefore emits six logs: `MetaTransactionExecuted`, `Approval`, `Transfer`, `Approval`, `Transfer`, `Approval`.
-  - It emits four logs, without the first two, when the meta-tx was executed before.
+  - A META_TX_APPROVE call with a fee therefore emits seven logs: `MetaTransactionExecuted`, `Approval`, `Transfer`, `Approval`, `Transfer`, `Approval`, `TransferRelayed`.
+  - It emits five logs, without the first two, when the meta-tx was executed before.
 
-An executed request shows on-chain as a successful call of the relay's transaction, the principal `Transfer` and `nonces(from)` above the signed nonce. `NonceInvalidated` marks nonces the signer cancelled.
+An executed request shows on-chain as its `TransferRelayed(from, nonce, digest)` log. All three fields are indexed: a log filter on the contract address, `from` and `nonce` finds the request that used a nonce, and `digest` identifies which of the requests signed for that nonce it was (the relay request id). `NonceInvalidated` marks nonces the signer cancelled.
+
+The Polygon and Amoy deployments listed in the README were built from commit `837fb6b`, before `TransferRelayed` was added, and emit no event for a transfer. There an executed request shows only as a successful call of the relay's transaction, the principal `Transfer` and `nonces(from)` above the signed nonce; telling apart several requests signed for that nonce takes the transaction's call data.
 
 ### 4.4 External surface (allowlist)
 
@@ -319,7 +329,7 @@ The SDK is an off-chain client component and not part of this repository. The cl
   - only the spec handler also configures tokens outside the initial set, and reconfigures a token between a request's signature and its submission.
 - **Oracle.** Both handlers keep a ghost copy of what the owner set and judge every validly signed request against it, never against `tokenConfig()`: it executes, whatever its fee, only if the configuration at call time allows its token and mode, and it is refused with that configuration's error exactly when it does not. Forged, altered, replayed, misrouted and expired submissions only have to revert.
 - **Owner.** `tokenConfig()`, `owner()` and `pendingOwner()` equal the ghost copy. Only the pending owner accepts ownership, and after `renounceOwnership` nothing changes the configuration or the ownership. Owner actions move no balance, allowance or nonce.
-- **Events** (spec handler; the unit handler checks `TokenConfigSet`). A successful `invalidateNonces`, `setTokenConfig` or ownership step emits its one event; a transfer or a failed call emits none from the contract, and an executed transfer's `Transfer` logs are the fee, then the principal (§4.3).
+- **Events** (spec handler; the unit handler checks `TokenConfigSet`). A successful `invalidateNonces`, `setTokenConfig` or ownership step emits its one event, and an executed transfer exactly one `TransferRelayed` with the spec's digest of the request, after every token log; a failed call emits none from the contract, and an executed transfer's `Transfer` logs are the fee, then the principal (§4.3).
 - **Not vacuous.** Every spec run judged validly signed requests, attacked, and had the owner set a configuration (the first owner action of a run starts with the owner's own `setTokenConfig` of a token, whoever the fuzzer picks as callers); every unit run judged validly signed requests and attacked (`afterInvariant`). Self-tests drive every handler path, also every owner path, with fixed inputs.
 - **Owner rates.** Self-tests call each owner action of both handlers from one state for fixed seeds from keccak256, over the whole uint256 range and of every bit length (as the fuzzer draws them), and require the actions of the account allowed to act to take effect (the ghost copy follows them) at the designed rate, within four standard deviations of the binomial count. Spec: the owner calls in 3 of 4 calls of `setTokenConfig`, of the reconfiguration between signature and submission and of `transferOwnership`; a configuration for a token is always valid, and one for an address without code or the contract itself (2 of 10 targets) only if it removes (11 of 64). So it sets a configuration in 801 of 1280 `setTokenConfig` calls and in 3 of 4 reconfigurations, and names a candidate in 3 of 4 `transferOwnership` calls; with a transfer pending, the pending owner accepts in 5 of 8 acceptance calls. Unit: the owner sets a configuration in 6 of 8 configuration calls (it calls in 7, one with an invalid configuration), and every ownership call is one step of the account allowed to take it, an acceptance in 15 of 32. A renounce in 1 of 16. A handler that let the owner act, or set a valid configuration, only for small, large or odd seeds, or never, fails them; the per-run checks above cannot see it, and neither can the invariants, since the ghost copy follows a refusal.
 - **Configuration variety.** Self-tests over the same seed families (512 seeds each) classify the configurations set, read back with `tokenConfig()`, by modes (removed; permit and allowance; others), and require each class at its designed rate within four standard deviations. Spec `setTokenConfig`: 165, 456 and 180 of 1280 calls; reconfiguration between signature and submission: 66, 228 and 90 of 512. Unit: 36, 168 and 180 of 512. A handler that set one fixed valid configuration for large seeds passes the rate self-tests and every invariant, and fails these.
