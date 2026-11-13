@@ -34,6 +34,13 @@ library TokenAuthLib {
     ///      used up in the same way. The check runs before the transfers (not as "allowance == 0" after them), so a
     ///      refused call moves nothing and the whole rule stays in this library. Apart from that exact value, only
     ///      NONE mode spends a standing allowance, and it leaves the rest of it (TI5 does not cover NONE).
+    /// @param token The token to obtain the allowance for.
+    /// @param owner The sender of the request, whose tokens the caller pulls.
+    /// @param required The allowance the request needs: its amount plus its fee. The token call sets exactly this
+    ///        value.
+    /// @param deadline The request deadline. PERMIT mode uses it as the permit deadline.
+    /// @param auth The token authorization signed into the request: the mode and, for PERMIT and META_TX_APPROVE, the
+    ///        owner's token signature (v, r, s).
     function ensureAllowance(address token, address owner, uint256 required, uint256 deadline, TokenAuth calldata auth)
         internal
     {

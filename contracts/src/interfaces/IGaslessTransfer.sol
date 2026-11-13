@@ -24,6 +24,8 @@ interface IGaslessTransfer is IGaslessBase {
     /// @notice The EIP-712 type `from` signs: the GaslessTransfer struct type, then TOKEN_AUTH_TYPE().
     function TRANSFER_TYPE() external view returns (string memory);
 
+    /// @notice keccak256 of TRANSFER_TYPE(): the EIP-712 type hash of the request `from` signs.
+    /// @return The GaslessTransfer type hash.
     function TRANSFER_TYPEHASH() external view returns (bytes32);
 
     /// @notice Moves `amount` from `r.from` to `r.to` and `fee` to `r.relay` (== msg.sender), and uses nonce
