@@ -168,8 +168,9 @@ contract InvariantSpecTest is SpecBase {
     }
 
     /// @notice The contract's events match the actions: NonceInvalidated for a valid increase, TokenConfigSet for a
-    ///         configuration change, Ownable2Step's events for ownership steps, nothing for a transfer (D13) or a failed
-    ///         call; an executed transfer's token logs are the fee, then the principal (§4.3).
+    ///         configuration change, Ownable2Step's events for ownership steps, exactly one TransferRelayed, after
+    ///         every token log, for an executed transfer (D13), nothing for a failed call; an executed transfer's token
+    ///         logs are the fee, then the principal (§4.3).
     function invariant_eventsMatchActions() public view {
         assertEq(handler.eventViolations(), 0, "the contract's events differ from the actions");
     }

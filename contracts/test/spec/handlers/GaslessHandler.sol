@@ -137,8 +137,9 @@ contract GaslessHandler is CommonBase, StdCheats, StdUtils {
     uint256 public ownerViolations;
     /// @dev An owner action changed a balance, an allowance, a token nonce or an intent nonce.
     uint256 public ownerSideEffects;
-    /// @dev The contract's events differ from the action: none for relayTransfer (D13) or a failed call, exactly one
-    ///      NonceInvalidated, TokenConfigSet, OwnershipTransferStarted or OwnershipTransferred otherwise.
+    /// @dev The contract's events differ from the action: exactly one TransferRelayed, after every token log, for an
+    ///      executed relayTransfer (D13), none for a failed call, exactly one NonceInvalidated, TokenConfigSet,
+    ///      OwnershipTransferStarted or OwnershipTransferred otherwise.
     uint256 public eventViolations;
     bytes public lastValidFailure;
     uint256 public validSuccesses;
@@ -631,7 +632,7 @@ contract GaslessHandler is CommonBase, StdCheats, StdUtils {
         vm.recordLogs();
         vm.prank(r.relay);
         try gasless.relayTransfer(r, sig, auth) {
-            _checkTransferLogs(r);
+            _checkTransferLogs(r, before.nonce, auth);
             if (refusal.length != 0) ++configMismatches; // executed although the owner's configuration refuses it
             _book(r, sig, auth, before);
         } catch (bytes memory err) {
@@ -865,14 +866,21 @@ contract GaslessHandler is CommonBase, StdCheats, StdUtils {
         }
     }
 
-    /// @dev An executed request (§4.3 log order): the contract logs nothing, and the token's Transfer logs are the fee
-    ///      to the relay (only if fee > 0), then the principal to `to`.
-    function _checkTransferLogs(TransferRequest memory r) internal {
+    /// @dev An executed request (§4.3 log order): the token's Transfer logs are the fee to the relay (only if fee > 0),
+    ///      then the principal to `to`, and the contract's only log is the last one, TransferRelayed(from, nonce,
+    ///      digest) with the spec's digest of the request at `nonce`.
+    function _checkTransferLogs(TransferRequest memory r, uint256 nonce, TokenAuth memory auth) internal {
         Vm.Log[] memory logs = vm.getRecordedLogs();
+        bytes32 digest = _digest(r, nonce, auth);
         uint256 expected = r.fee > 0 ? 2 : 1;
         uint256 k;
+        uint256 own;
         for (uint256 i = 0; i < logs.length; ++i) {
-            if (logs[i].emitter == address(gasless)) ++eventViolations;
+            if (logs[i].emitter == address(gasless)) {
+                ++own;
+                if (i + 1 != logs.length || !_isTransferRelayed(logs[i], r.from, nonce, digest)) ++eventViolations;
+                continue;
+            }
             if (logs[i].emitter != r.token || logs[i].topics.length == 0 || logs[i].topics[0] != TRANSFER_EVENT) {
                 continue;
             }
@@ -882,7 +890,17 @@ contract GaslessHandler is CommonBase, StdCheats, StdUtils {
             }
             ++k;
         }
-        if (k != expected) ++eventViolations;
+        if (own != 1 || k != expected) ++eventViolations;
+    }
+
+    function _isTransferRelayed(Vm.Log memory log, address from, uint256 nonce, bytes32 digest)
+        internal
+        pure
+        returns (bool)
+    {
+        return log.topics.length == 4 && log.topics[0] == IGaslessTransfer.TransferRelayed.selector
+            && log.topics[1] == bytes32(uint256(uint160(from))) && log.topics[2] == bytes32(nonce)
+            && log.topics[3] == digest && log.data.length == 0;
     }
 
     function _isTransfer(Vm.Log memory log, address from, address to, uint256 value) internal pure returns (bool) {

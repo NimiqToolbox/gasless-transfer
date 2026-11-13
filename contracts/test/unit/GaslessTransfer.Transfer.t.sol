@@ -5,12 +5,12 @@ import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
 import {Vm} from "forge-std/Vm.sol";
 
 import {AuthMode, TokenAuth} from "../../src/interfaces/IGaslessBase.sol";
-import {TransferRequest} from "../../src/interfaces/IGaslessTransfer.sol";
+import {IGaslessTransfer, TransferRequest} from "../../src/interfaces/IGaslessTransfer.sol";
 import {MockUSDT0} from "../mocks/MockUSDT0.sol";
 import {GaslessTestBase} from "../utils/GaslessTestBase.sol";
 
 /// @notice Successful transfers: TI1, T10 (exact amounts), D4/D10 (every token and mode through one contract),
-///         D5 (fee to the relay) and D13 (fee first, the principal Transfer last; the contract emits no event).
+///         D5 (fee to the relay) and D13 (fee first, then the principal Transfer, then the contract's TransferRelayed).
 contract GaslessTransferTransferTest is GaslessTestBase {
     bytes32 internal constant TRANSFER_EVENT = keccak256("Transfer(address,address,uint256)");
     bytes32 internal constant APPROVAL_EVENT = keccak256("Approval(address,address,uint256)");
@@ -76,9 +76,10 @@ contract GaslessTransferTransferTest is GaslessTestBase {
         assertEq(usdc.balanceOf(relay), 0, "relay got a fee");
         assertEq(usdc.balanceOf(bob), 10e6, "recipient");
         assertEq(usdc.balanceOf(alice), INITIAL_BALANCE - 10e6, "sender");
-        // Approval (permit), Transfer(alice -> bob): no fee Transfer.
-        assertEq(logs.length, 2, "log count");
+        // Approval (permit), Transfer(alice -> bob), TransferRelayed: no fee Transfer.
+        assertEq(logs.length, 3, "log count");
         _assertTransfer(logs[1], address(usdc), alice, bob, 10e6);
+        _assertTransferRelayed(logs[2], r, 0, auth);
     }
 
     function test_T10_largeFeeAndWholeBalance() public {
@@ -149,10 +150,11 @@ contract GaslessTransferTransferTest is GaslessTestBase {
         _submit(r, sig, auth);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
-        assertEq(logs.length, 3, "log count");
+        assertEq(logs.length, 4, "log count");
         _assertApproval(logs[0], address(usdc), alice, 102e6);
         _assertTransfer(logs[1], address(usdc), alice, relay, 2e6);
         _assertTransfer(logs[2], address(usdc), alice, bob, 100e6);
+        _assertTransferRelayed(logs[3], r, 0, auth);
     }
 
     /// @dev USDT0 also emits Approval on every transferFrom (allowance decrease); the Transfer order is unchanged.
@@ -165,13 +167,14 @@ contract GaslessTransferTransferTest is GaslessTestBase {
         _submit(r, sig, auth);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
-        assertEq(logs.length, 6, "log count");
+        assertEq(logs.length, 7, "log count");
         assertEq(logs[0].topics[0], MockUSDT0.MetaTransactionExecuted.selector, "meta-tx first");
         _assertApproval(logs[1], address(usdt0), alice, 102e6);
         _assertTransfer(logs[2], address(usdt0), alice, relay, 2e6);
         _assertApproval(logs[3], address(usdt0), alice, 100e6);
         _assertTransfer(logs[4], address(usdt0), alice, bob, 100e6);
         _assertApproval(logs[5], address(usdt0), alice, 0);
+        _assertTransferRelayed(logs[6], r, 0, auth);
     }
 
     function test_D13_logOrder_none() public {
@@ -183,9 +186,10 @@ contract GaslessTransferTransferTest is GaslessTestBase {
         _submit(r, sig, _noneAuth());
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
-        assertEq(logs.length, 2, "log count");
+        assertEq(logs.length, 3, "log count");
         _assertTransfer(logs[0], address(usdc), alice, relay, 2e6);
         _assertTransfer(logs[1], address(usdc), alice, bob, 100e6);
+        _assertTransferRelayed(logs[2], r, 0, _noneAuth());
     }
 
     /// @dev Exactly amount + fee already approved does not skip a still valid permit: it executes and logs its
@@ -200,10 +204,11 @@ contract GaslessTransferTransferTest is GaslessTestBase {
         _submit(r, sig, auth);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
-        assertEq(logs.length, 3, "log count");
+        assertEq(logs.length, 4, "log count");
         _assertApproval(logs[0], address(usdc), alice, 102e6);
         _assertTransfer(logs[1], address(usdc), alice, relay, 2e6);
         _assertTransfer(logs[2], address(usdc), alice, bob, 100e6);
+        _assertTransferRelayed(logs[3], r, 0, auth);
         assertEq(usdc.nonces(alice), 1, "the permit executed");
     }
 
@@ -219,16 +224,20 @@ contract GaslessTransferTransferTest is GaslessTestBase {
         _submit(r, sig, auth);
         Vm.Log[] memory logs = vm.getRecordedLogs();
 
-        assertEq(logs.length, 6, "log count");
+        assertEq(logs.length, 7, "log count");
         _assertApproval(logs[1], address(usdt0), alice, 1e6 + fee);
         _assertTransfer(logs[2], address(usdt0), alice, relay, fee);
         _assertApproval(logs[3], address(usdt0), alice, 1e6);
         _assertTransfer(logs[4], address(usdt0), alice, bob, 1e6);
         _assertApproval(logs[5], address(usdt0), alice, 0);
+        _assertTransferRelayed(logs[6], r, 0, auth);
     }
 
-    /// @dev The contract itself emits no event for a transfer: the tokens' logs carry every detail.
-    function test_D13_noContractEvent() public {
+    /// @dev The contract logs exactly one event for a transfer, as its last log, in every mode and at any nonce:
+    ///      TransferRelayed(from, nonce, digest) with digest = hashTransfer(r, nonce, auth), the request id.
+    function test_D13_transferRelayedEvent() public {
+        vm.prank(alice);
+        gasless.invalidateNonces(7);
         for (uint8 c = 0; c < 5; ++c) {
             (address token, AuthMode mode) = _combo(c);
             TransferRequest memory r = _request(token, 1e6, 10_000);
@@ -237,9 +246,10 @@ contract GaslessTransferTransferTest is GaslessTestBase {
             vm.recordLogs();
             _submit(r, sig, auth);
             Vm.Log[] memory logs = vm.getRecordedLogs();
-            for (uint256 i = 0; i < logs.length; ++i) {
-                assertTrue(logs[i].emitter != address(gasless), "event emitted by GaslessTransfer");
+            for (uint256 i = 0; i + 1 < logs.length; ++i) {
+                assertTrue(logs[i].emitter != address(gasless), "GaslessTransfer logged before its last log");
             }
+            _assertTransferRelayed(logs[logs.length - 1], r, 7 + c, auth);
         }
     }
 
@@ -259,7 +269,7 @@ contract GaslessTransferTransferTest is GaslessTestBase {
     }
 
     /// @dev TI1: from pays amount + fee, to gets amount, relay (== msg.sender) gets fee, the nonce goes up by exactly
-    ///      one, the contract keeps nothing and no allowance is left.
+    ///      one, the contract keeps nothing and no allowance is left. The contract logs TransferRelayed for that nonce.
     function _submitAndAssertTI1(TransferRequest memory r, AuthMode mode) internal {
         IERC20 token = IERC20(r.token);
         TokenAuth memory auth = _authFor(alicePk, r, mode);
@@ -268,7 +278,10 @@ contract GaslessTransferTransferTest is GaslessTestBase {
         uint256 toBefore = token.balanceOf(r.to);
         uint256 relayBefore = token.balanceOf(r.relay);
         uint256 nonceBefore = gasless.nonces(r.from);
+        bytes32 digest = gasless.hashTransfer(r, nonceBefore, auth);
 
+        vm.expectEmit(true, true, true, true, address(gasless));
+        emit IGaslessTransfer.TransferRelayed(r.from, nonceBefore, digest);
         _submit(r, sig, auth);
 
         assertEq(token.balanceOf(r.from), fromBefore - r.amount - r.fee, "from pays amount + fee");
@@ -277,6 +290,20 @@ contract GaslessTransferTransferTest is GaslessTestBase {
         assertEq(token.balanceOf(address(gasless)), 0, "no custody");
         assertEq(gasless.nonces(r.from), nonceBefore + 1, "nonce + 1");
         assertEq(token.allowance(r.from, address(gasless)), 0, "no leftover allowance");
+    }
+
+    /// @dev `log` is TransferRelayed(r.from, nonce, hashTransfer(r, nonce, auth)) by the contract, without data.
+    function _assertTransferRelayed(Vm.Log memory log, TransferRequest memory r, uint256 nonce, TokenAuth memory auth)
+        internal
+        view
+    {
+        assertEq(log.emitter, address(gasless), "TransferRelayed emitter");
+        assertEq(log.topics.length, 4, "TransferRelayed topics");
+        assertEq(log.topics[0], IGaslessTransfer.TransferRelayed.selector, "TransferRelayed topic");
+        assertEq(address(uint160(uint256(log.topics[1]))), r.from, "TransferRelayed from");
+        assertEq(uint256(log.topics[2]), nonce, "TransferRelayed nonce");
+        assertEq(log.topics[3], gasless.hashTransfer(r, nonce, auth), "TransferRelayed digest");
+        assertEq(log.data.length, 0, "TransferRelayed data");
     }
 
     function _assertTransfer(Vm.Log memory log, address token, address from, address to, uint256 value) internal pure {

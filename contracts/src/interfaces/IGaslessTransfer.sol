@@ -21,13 +21,17 @@ struct TransferRequest {
 
 /// @notice Gasless ERC-20 transfers, submitted by the relay that the sender signed for.
 interface IGaslessTransfer is IGaslessBase {
+    /// @notice relayTransfer executed the request of `from` at nonce `nonce`; `digest` is its hashTransfer(r, nonce,
+    ///         auth), the request id.
+    event TransferRelayed(address indexed from, uint256 indexed nonce, bytes32 indexed digest);
+
     /// @notice The EIP-712 type `from` signs: the GaslessTransfer struct type, then TOKEN_AUTH_TYPE().
     function TRANSFER_TYPE() external view returns (string memory);
 
     function TRANSFER_TYPEHASH() external view returns (bytes32);
 
-    /// @notice Moves `amount` from `r.from` to `r.to` and `fee` to `r.relay` (== msg.sender), and uses nonce
-    ///         nonces(r.from). Nothing but `from`'s signature bounds the fee.
+    /// @notice Moves `amount` from `r.from` to `r.to` and `fee` to `r.relay` (== msg.sender), uses nonce
+    ///         nonces(r.from) and emits TransferRelayed. Nothing but `from`'s signature bounds the fee.
     function relayTransfer(TransferRequest calldata r, bytes calldata signature, TokenAuth calldata auth) external;
 
     /// @notice The EIP-712 digest of `r` at `nonce` with `auth`; the relay uses it as the request id.
