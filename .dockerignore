@@ -1,0 +1,24 @@
+# Docker matches a pattern from the context root only; `**/` applies it at any depth. Three images copy the whole
+# context (docker/dev.Dockerfile, verify.Dockerfile, artifacts.Dockerfile), so local state and secrets must be
+# excluded wherever they lie.
+.git/
+build/
+coverage/
+secrets/
+relay/data/
+**/.env
+**/.env.*
+!**/.env.example
+**/*.env
+**/*.key
+**/*.pem
+**/*.p12
+**/*.pfx
+**/*.sqlite*
+**/node_modules/
+**/dist/
+contracts/out/
+contracts/cache/
+contracts/broadcast/
+contracts/lib/
+contracts/.deps.*/

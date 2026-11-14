@@ -1,0 +1,215 @@
+# Everything runs in containers. The `workspace` image copies the repo in, so runs are hermetic and
+# independent of host file ownership; `run --build` picks up edits. The make targets (docs/DEVELOPMENT.md) use the
+# `stack` profile; the `contracts` and `node-test` services are an alternative to docker/test-contained.sh.
+name: gasless
+
+x-contained-tools: &contained-tools
+  init: true
+  user: "1000:1000"
+  read_only: true
+  cpus: 4
+  mem_limit: 6g
+  memswap_limit: 6g
+  pids_limit: 512
+  cap_drop: [ALL]
+  security_opt: [no-new-privileges:true]
+  tmpfs:
+    - /tmp:rw,nosuid,nodev,size=2g,mode=1777
+    - /home/node/.foundry/cache:rw,nosuid,nodev,size=512m,uid=1000,gid=1000
+    - /work/contracts/out:rw,nosuid,nodev,size=768m,uid=1000,gid=1000
+    - /work/contracts/cache:rw,nosuid,nodev,size=768m,uid=1000,gid=1000
+    - /work/contracts/broadcast:rw,nosuid,nodev,size=128m,uid=1000,gid=1000
+    - /work/contracts/deployments:rw,nosuid,nodev,size=16m,uid=1000,gid=1000
+    - /work/relay/dist:rw,nosuid,nodev,size=128m,uid=1000,gid=1000
+    - /work/node_modules/.vite-temp:rw,nosuid,nodev,size=32m,uid=1000,gid=1000
+    - /work/sdk/node_modules/.vite-temp:rw,nosuid,nodev,size=32m,uid=1000,gid=1000
+    - /work/relay/node_modules/.vite-temp:rw,nosuid,nodev,size=32m,uid=1000,gid=1000
+    - /work/sdk/node_modules/.vite:rw,nosuid,nodev,size=32m,uid=1000,gid=1000
+    - /work/relay/node_modules/.vite:rw,nosuid,nodev,size=32m,uid=1000,gid=1000
+
+x-workspace: &workspace
+  <<: *contained-tools
+  image: gasless/workspace:local
+  pull_policy: build
+  build:
+    context: .
+    dockerfile: docker/dev.Dockerfile
+    target: workspace
+  network_mode: none
+
+# Tool containers of the local stack run the workspace image, tagged by STACK_IMAGE_TAG (for example per
+# CI job). Only `anvil` builds it: one build per `up`, so all of them run the same image. The stack's
+# images are local builds only (pull_policy: never): nothing is ever pulled under their names.
+x-stack-tools: &stack-tools
+  <<: *contained-tools
+  image: gasless/workspace:${STACK_IMAGE_TAG:-local}
+  pull_policy: never
+  profiles: [stack]
+  networks: [stack-private]
+  # No external DNS: only the stack's own service names resolve.
+  dns: [127.0.0.1]
+
+services:
+  # docker compose run --build --rm contracts 'forge fmt --check && forge test -vvv'
+  contracts:
+    <<: *workspace
+    working_dir: /work/contracts
+    environment:
+      POLYGON_RPC_URL: ""
+      FORK_BLOCK: ${FORK_BLOCK:-94421000}
+
+  # SDK is prebuilt: tests do not write to its read-only dist. Fork tests use explicit Make targets.
+  node-test:
+    <<: *workspace
+    working_dir: /work
+    environment:
+      POLYGON_RPC_URL: ""
+      GASLESS_PREBUILT_SDK: "true"
+
+  # --- Local stack (profile "stack"): make stack-up, make stack-test, make stack-down --------------
+  # A plain anvil (chain 31337), the contracts deployed by DeployLocalStack, and the relay's production
+  # image with a well-known anvil dev key. No host ports: the services talk over the compose network.
+
+  anvil:
+    <<: *stack-tools
+    build:
+      context: .
+      dockerfile: docker/dev.Dockerfile
+      target: workspace
+    command: ["anvil --host 0.0.0.0 --port 8545 --chain-id 31337 --accounts 20 ${STACK_ANVIL_ARGS:-}"]
+    healthcheck:
+      test: ["CMD", "cast", "chain-id", "--rpc-url", "http://127.0.0.1:8545"]
+      interval: 1s
+      timeout: 5s
+      retries: 60
+
+  # Deploys MockUSDC, MockUSDT0 and GaslessTransfer once per chain (skipped while the recorded contract
+  # still has code), then writes the deployment file and the relay's dev key (anvil account 10, a
+  # well-known test key) into named volumes. anvil keeps its chain in memory: after a fresh deploy the
+  # relay's database (nonce, requests) belongs to a chain that no longer exists and is removed.
+  # Empty named volumes inherit uid 1000 and mode 0700 from the image's precreated mount points.
+  # Existing incompatible volume ownership fails closed; this fixture never changes ownership as root.
+  deploy:
+    <<: *stack-tools
+    working_dir: /work/contracts
+    depends_on:
+      anvil:
+        condition: service_healthy
+    volumes:
+      - stack-deployment:/stack
+      - stack-secrets:/stack-secrets
+      - stack-relay-data:/relay-data
+    command:
+      - |
+        for dir in /stack /stack-secrets /relay-data; do
+          if [ ! -w "$$dir" ]; then
+            echo "Local fixture volume is not writable by uid 1000: $$dir" >&2
+            exit 1
+          fi
+        done
+        rpc=http://anvil:8545
+        code=0x
+        if [ -f /stack/deployment.json ]; then
+          code=$$(cast code --rpc-url $$rpc "$$(jq -er .gaslessTransfer /stack/deployment.json)")
+        fi
+        if [ "$$code" != "0x" ] && [ -f /stack/price-feed ]; then
+          echo "local stack already deployed: $$(jq -c '{chainId, gaslessTransfer}' /stack/deployment.json)"
+        else
+          forge script script/DeployLocalStack.s.sol --rpc-url $$rpc --broadcast --unlocked \
+            --sender 0xf39Fd6e51aad88F6F4ce6aB8827279cffFb92266
+          cp deployments/31337.json /stack/deployment.json
+          cp deployments/31337.feed /stack/price-feed
+          rm -f /relay-data/relay.sqlite /relay-data/relay.sqlite-wal /relay-data/relay.sqlite-shm
+        fi
+        # Replace the test-only key via a new file: an earlier run leaves the final file mode 0400.
+        umask 077
+        cast wallet private-key "test test test test test test test test test test test junk" 10 > /stack-secrets/relay_key.next
+        mv /stack-secrets/relay_key.next /stack-secrets/relay_key
+        chmod 0400 /stack-secrets/relay_key
+
+  relay:
+    image: gasless/relay:${STACK_IMAGE_TAG:-local}
+    pull_policy: never
+    build:
+      context: .
+      dockerfile: docker/relay.Dockerfile
+    profiles: [stack]
+    init: true
+    cpus: 1
+    mem_limit: 256m
+    memswap_limit: 256m
+    pids_limit: 64
+    # As in compose.production.yaml: no core dumps of the process that holds the key.
+    ulimits:
+      core: 0
+    networks: [stack-private]
+    dns: [127.0.0.1]
+    # Restarted when compose restarts or recreates anvil or deploy: a new chain means a new deployment
+    # and a new database (without the contracts, startup verification stops the relay).
+    depends_on:
+      anvil:
+        condition: service_healthy
+        restart: true
+      deploy:
+        condition: service_completed_successfully
+        restart: true
+    environment:
+      RELAY_RPC_URLS: http://anvil:8545
+      RELAY_DEPLOYMENT_FILE: /stack/deployment.json
+      RELAY_POLL_INTERVAL_MS: "500"
+      RELAY_LOG_LEVEL: ${STACK_RELAY_LOG_LEVEL:-info}
+      # The internal listener (/metrics, the readiness report; port 9464) on the stack's own network, for
+      # the health check and the stack test. Nothing here publishes a port to the host.
+      RELAY_OPS_HOST: 0.0.0.0
+    volumes:
+      - stack-deployment:/stack:ro
+      - stack-secrets:/run/secrets:ro # RELAY_PRIVATE_KEY_FILE=/run/secrets/relay_key (image default)
+      - stack-relay-data:/data
+    command: ["sh", "-ec", 'export RELAY_POLUSD_FEED="$$(cat /stack/price-feed)"; exec node /app/dist/main.js']
+    # Runtime restrictions: read-only root filesystem (the
+    # database is in the /data volume, SQLite's temporary files go to the tmpfs /tmp), no Linux
+    # capabilities, no privilege escalation.
+    read_only: true
+    tmpfs:
+      - /tmp:size=64m,noexec,nosuid,nodev
+    cap_drop: [ALL]
+    security_opt:
+      - no-new-privileges:true
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:9464/readyz').then((r) => process.exit(r.ok ? 0 : 1), () => process.exit(1))"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+      start_period: 5s
+
+  # Smoke test against the running stack (relay/test/stack): pnpm --filter @nimiq/gasless-relay test:stack
+  stack-test:
+    <<: *stack-tools
+    working_dir: /work
+    depends_on:
+      relay:
+        condition: service_healthy
+    environment:
+      STACK_RELAY_URL: http://relay:8080
+      STACK_RPC_URL: http://anvil:8545
+      STACK_DEPLOYMENT_FILE: /stack/deployment.json
+      STACK_RELAY_ADDRESS: "0xBcd4042DE499D14e55001CcbB24a551F3b954096" # anvil account 10
+      GASLESS_PREBUILT_SDK: "true"
+    volumes:
+      - stack-deployment:/stack:ro
+    command: ["pnpm --filter @nimiq/gasless-relay test:stack"]
+
+networks:
+  stack-private:
+    internal: true
+    driver_opts:
+      com.docker.network.bridge.gateway_mode_ipv4: isolated
+    # A small fixed subnet, so the network does not depend on Docker's default address pools.
+    ipam:
+      config:
+        - subnet: 10.253.240.64/28
+
+volumes:
+  stack-deployment:
+  stack-secrets:
+  stack-relay-data:

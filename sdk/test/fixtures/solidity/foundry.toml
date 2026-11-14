@@ -1,0 +1,19 @@
+# Test doubles for the SDK's anvil tests (sdk/test/viem/anvil.test.ts). Compiled inside the toolchain
+# container only (OpenZeppelin comes from /deps); the tests pass --out and --cache-path in a temp dir.
+[profile.default]
+src = "src"
+libs = []
+solc_version = "0.8.28"
+evm_version = "cancun"
+offline = true
+optimizer = true
+optimizer_runs = 200
+remappings = [
+    "@openzeppelin/contracts/=/deps/openzeppelin-contracts/contracts/",
+    "@gasless/=../../../../contracts/src/",
+]
+allow_paths = ["/deps", "../../../../contracts/src"]
+
+# The token doubles deliberately replicate token behaviour the linter flags (raw ecrecover in USDT0).
+[lint]
+lint_on_build = false

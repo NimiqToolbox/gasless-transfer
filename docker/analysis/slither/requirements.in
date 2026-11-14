@@ -1,0 +1,4 @@
+# Top-level Python tools of docker/analysis.Dockerfile. requirements.txt pins every transitive dependency by
+# version and sha256; regenerate it after changing this file (docs/supply-chain.md).
+slither-analyzer==0.11.6
+crytic-compile==0.4.2

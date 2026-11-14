@@ -4,7 +4,15 @@ Gasless USDC and USDT0 transfers on Polygon PoS. A sender signs a transfer inten
 
 Each intent binds the sender, recipient, token, amount, fee, relay, deadline, the sender's sequential nonce and the token authorization. Token authorization supports permits and existing allowances, with meta-transaction approval available for USDT0.
 
-This repository contains the Solidity contracts, their tests and deployment scripts. The [protocol reference](docs/STEP-1-GAS-ABSTRACTION.md) specifies the contracts and the signing rules clients follow.
+This repository contains the three parts of the protocol and their tests:
+
+| Part | Path | What it is |
+| --- | --- | --- |
+| Contracts | [contracts/](contracts/) | `GaslessTransfer` (Solidity), its tests and deployment scripts |
+| SDK | [sdk/](sdk/README.md) | TypeScript client: typed data, pins, signing, relay client and on-chain confirmation |
+| Relay | [relay/](relay/README.md) | TypeScript server that validates signed intents, quotes fees and submits the transactions |
+
+The [protocol reference](docs/STEP-1-GAS-ABSTRACTION.md) specifies the contracts, the signing rules and the relay API. The relay is software to run yourself; clients configure the relay URL and address they trust ([SDK pins](sdk/README.md)).
 
 ## Deployed contracts — Polygon PoS
 
@@ -54,7 +62,31 @@ Record: [contracts/deployments/80002.json](contracts/deployments/80002.json).
 
 ## Build and test
 
-Requires Foundry 1.8.3 (natively or its pinned Docker image). [Development](docs/DEVELOPMENT.md) lists the pinned toolchain and the commands for building, testing, fork tests and the long invariant profile.
+The contracts need only Foundry 1.8.3 (natively or its pinned Docker image) and the two pinned libraries in `contracts/lib` ([how to fetch them](docs/DEVELOPMENT.md#dependencies)):
+
+```sh
+cd contracts
+forge build
+forge test
+```
+
+Contracts, SDK and relay together build and test in Docker (Linux, Docker Engine, Docker Compose v2, Bash and Make):
+
+```sh
+make test-contained      # type checks, SDK and relay tests, Solidity formatting and tests
+make relay-image-check   # builds the relay runtime image and checks it from the inside
+make stack-up            # local stack: Anvil, mock tokens, GaslessTransfer and the relay
+make stack-test
+make stack-down
+```
+
+Image builds need network access; the tests run offline with disposable keys. Polygon fork tests read an archive RPC and broadcast nothing:
+
+```sh
+POLYGON_RPC_URL=https://your-archive-rpc.example make test-fork-contained
+```
+
+[Development](docs/DEVELOPMENT.md) lists the pinned toolchain and every command; [testing](docs/testing.md) describes the suites.
 
 ## Repository layout
 
@@ -62,18 +94,33 @@ Requires Foundry 1.8.3 (natively or its pinned Docker image). [Development](docs
 | --- | --- |
 | `contracts/src/` | `GaslessTransfer`, `GaslessBase`, `TokenAuthLib` and their interfaces |
 | `contracts/test/` | Unit, specification, invariant, fork and golden-vector tests, test mocks |
-| `contracts/test/vectors/data/` | Golden vectors: EIP-712 digests of transfers and token authorizations |
+| `contracts/test/vectors/data/` | Golden vectors: EIP-712 digests of transfers and token authorizations, checked by the contracts and the SDK |
 | `contracts/script/` | Deployment scripts and the deployment-record writer |
 | `contracts/deployments/` | Deployment records per chain ID |
-| `docs/` | Protocol reference, development and deployment verification |
+| `sdk/src/` | `core` (zero-dependency signing core), `relay` (relay client), `viem` (viem adapter) |
+| `sdk/abi/` | ABIs of GaslessTransfer and of the token functions the SDK uses |
+| `sdk/test/` | SDK tests; `sdk/scripts/` regenerates the ABI files |
+| `relay/src/` | HTTP API, validation pipeline, fee engine, transaction manager and SQLite store |
+| `relay/config/` | Gas table, token implementation pins, example policy and alert rules |
+| `relay/scripts/` | Operator scripts: state backup, token-pin collection and deployment verification |
+| `relay/test/` | Relay tests by kind ([testing](docs/testing.md)) |
+| `relay/docs/` | Storage and transaction lifecycle of the relay |
+| `docker/` | Build, test and runtime images and their contained runners |
+| `scripts/` | Native build helper and verification scripts |
+| `docs/` | Protocol reference, development, deployment and operations |
 
 ## Documentation
 
-- [Protocol reference](docs/STEP-1-GAS-ABSTRACTION.md) — contracts, signatures, invariants and token authorization.
-- [Development](docs/DEVELOPMENT.md) — toolchain, build and tests.
+- [Protocol reference](docs/STEP-1-GAS-ABSTRACTION.md) — contracts, signatures, invariants, token authorization and the relay API.
+- [SDK](sdk/README.md) — client integration and examples.
+- [Relay](relay/README.md) — configuration, HTTP API and operation; [storage](relay/docs/storage.md) and [transaction lifecycle](relay/docs/transaction-lifecycle.md).
+- [Development](docs/DEVELOPMENT.md) — toolchain, build and tests; [testing](docs/testing.md) — the test suites.
+- [Deployment](docs/deployment.md) — building, deploying contracts and running a relay; [Linux relay operation](docs/operations/linux-relay.md).
 - [Polygon deployment](docs/operations/polygon-137-deployment.md) — reproducing the deployed bytecode.
-- [Security](SECURITY.md) — trust assumptions and vulnerability reporting.
+- [Supply chain](docs/supply-chain.md) and [dependencies](docs/dependencies.md) — how build inputs are pinned, and licenses.
+- [Containment](docs/containment.md) — the sandbox of the test and build runners.
+- [Security](SECURITY.md) — trust assumptions, operating risks and vulnerability reporting.
 
 ## License
 
-[MIT](LICENSE). Dependencies retain their own licenses.
+[MIT](LICENSE). Dependencies retain their own licenses; see [dependencies](docs/dependencies.md).

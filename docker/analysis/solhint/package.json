@@ -1,0 +1,8 @@
+{
+  "name": "gasless-analysis-solhint",
+  "private": true,
+  "description": "solhint for docker/analysis.Dockerfile, installed with npm ci from package-lock.json (docs/supply-chain.md)",
+  "dependencies": {
+    "solhint": "6.2.4"
+  }
+}

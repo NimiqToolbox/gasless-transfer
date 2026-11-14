@@ -1,0 +1,34 @@
+packages:
+  - sdk
+  - relay
+
+# pnpm 10 skips dependency lifecycle scripts unless allowed here.
+onlyBuiltDependencies:
+  - better-sqlite3
+  - esbuild
+
+# Supply-chain policy for every resolution that writes pnpm-lock.yaml; see docs/supply-chain.md. Installs from
+# the committed lockfile (--frozen-lockfile) resolve nothing and are unaffected.
+# Resolve only versions published at least 7 days (10080 minutes) ago.
+minimumReleaseAge: 10080
+# Refuse a version published with weaker evidence (no provenance, no trusted publisher) than an earlier
+# version of the same package: a possible account takeover.
+trustPolicy: no-downgrade
+# Transitive dependencies must come from the registry, not from git repositories or tarball URLs.
+blockExoticSubdeps: true
+# Fail instead of warn when a dependency has install scripts that onlyBuiltDependencies does not list.
+strictDepBuilds: true
+# Exceptions take exact versions only (name@x.y.z or name@x.y.z||x.y.w). Remove an entry when it is no longer
+# locked. An urgent security release younger than 7 days goes here until it is 7 days old:
+minimumReleaseAgeExclude: []
+# Reviewed trust downgrades. Both are dev-only versions (tsup's chokidar, ethers 6's @types/node) that their
+# maintainers published without provenance in 2024 after earlier releases had it.
+trustPolicyExclude:
+  - chokidar@4.0.3
+  - undici-types@6.19.8
+
+# Security overrides for dev-only dependencies. ethers 5.8.0 (the SDK's ethers5 test dependency, its last release)
+# pins ws 8.18.0 exactly, which has GHSA-96hv-2xvq-fx4p and GHSA-58qx-3vcg-4xpx. 8.21.0 fixes both and is the
+# version viem already locks. Remove the entry together with ethers5.
+overrides:
+  '@ethersproject/providers>ws': 8.21.0

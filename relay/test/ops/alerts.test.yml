@@ -1,0 +1,163 @@
+rule_files:
+  - ../../config/alerts.yml
+evaluation_interval: 1m
+tests:
+  - name: Scrape failure alerts even when application metrics are absent
+    interval: 1m
+    input_series:
+      - series: up{job="gasless-relay",instance="127.0.0.1:9464"}
+        values: '0 0 1'
+      - series: up{job="gasless-relay-readiness",instance="http://127.0.0.1:9464/readyz"}
+        values: '0 0 1'
+    alert_rule_test:
+      - {eval_time: 0m, alertname: RelayMonitoringUnavailable, exp_alerts: []}
+      - eval_time: 1m
+        alertname: RelayMonitoringUnavailable
+        exp_alerts:
+          - exp_labels: {severity: critical, job: gasless-relay, instance: '127.0.0.1:9464'}
+            exp_annotations:
+              summary: Relay metrics or readiness probe cannot be scraped
+              description: Check the relay, blackbox exporter and private monitoring network. Missing scrapes must not look healthy.
+          - exp_labels: {severity: critical, job: gasless-relay-readiness, instance: 'http://127.0.0.1:9464/readyz'}
+            exp_annotations:
+              summary: Relay metrics or readiness probe cannot be scraped
+              description: Check the relay, blackbox exporter and private monitoring network. Missing scrapes must not look healthy.
+      - {eval_time: 2m, alertname: RelayMonitoringUnavailable, exp_alerts: []}
+  - name: Healthy relay does not alert
+    interval: 1m
+    input_series:
+      - series: relay_gas_exposure_pol
+        values: '0.79+0x10'
+      - series: relay_gas_budget_pol
+        values: '1+0x10'
+      - series: relay_reverted_call_gas_pol_total{operation="transfer"}
+        values: '0+0x10'
+      - series: relay_token_domain_mismatch{token="USDC"}
+        values: '0+0x10'
+      - series: relay_token_implementation_unavailable{token="USDC"}
+        values: '0+0x10'
+      - series: relay_rpc_history_unavailable{rpc="2"}
+        values: '0+0x10'
+      - series: relay_rpc_head_lag_blocks{rpc="2"}
+        values: '5+0x10'
+      - series: probe_success{job="gasless-relay-readiness"}
+        values: '1+0x10'
+    alert_rule_test:
+      - {eval_time: 6m, alertname: RelayRpcHeadLagging, exp_alerts: []}
+      - {eval_time: 6m, alertname: RelayGasBudgetNearLimit, exp_alerts: []}
+      - {eval_time: 6m, alertname: RelayGasBudgetReached, exp_alerts: []}
+      - {eval_time: 6m, alertname: RelayRevertedCallLoss, exp_alerts: []}
+      - {eval_time: 6m, alertname: RelayTokenDomainMismatch, exp_alerts: []}
+      - {eval_time: 6m, alertname: RelayTokenImplementationUnavailable, exp_alerts: []}
+      - {eval_time: 6m, alertname: RelayRpcHistoryUnavailable, exp_alerts: []}
+      - {eval_time: 6m, alertname: RelayUnready, exp_alerts: []}
+  - name: Operational failures produce the expected alerts and labels
+    interval: 1m
+    input_series:
+      - series: relay_gas_exposure_pol
+        values: '1+0x10'
+      - series: relay_gas_budget_pol
+        values: '1+0x10'
+      - series: relay_reverted_call_gas_pol_total{operation="transfer"}
+        values: '0+0.01x10'
+      - series: relay_token_domain_mismatch{token="USDC"}
+        values: '1+0x10'
+      - series: relay_token_implementation_unavailable{token="USDC"}
+        values: '1+0x10'
+      - series: probe_success{job="gasless-relay-readiness"}
+        values: '0+0x10'
+    alert_rule_test:
+      - eval_time: 6m
+        alertname: RelayGasBudgetNearLimit
+        exp_alerts:
+          - exp_labels: {severity: warning}
+            exp_annotations:
+              summary: Relay lifetime gas exposure exceeds 80% of its operator ceiling
+              description: Review receipts, losses and outstanding nonces before authorizing any increase. Do not delete or reset the database.
+      - eval_time: 6m
+        alertname: RelayGasBudgetReached
+        exp_alerts:
+          - exp_labels: {severity: critical}
+            exp_annotations:
+              summary: Relay lifetime gas ceiling has been reached
+              description: Additional exposure is refused. Reconciliation and already-budgeted broadcasts may continue.
+      - eval_time: 6m
+        alertname: RelayRevertedCallLoss
+        exp_alerts:
+          - exp_labels: {severity: warning, operation: transfer}
+            exp_annotations:
+              summary: Relay paid more than 0.01 POL for reverted calls in five minutes
+              description: "Check sender activity, token administration and gas behavior. This rate metric can reset on restart; the durable gas ceiling cannot."
+      - eval_time: 6m
+        alertname: RelayTokenDomainMismatch
+        exp_alerts:
+          - exp_labels: {severity: critical, token: USDC}
+            exp_annotations:
+              summary: Token authorization domain differs from reviewed configuration
+              description: Investigate issuer changes before updating the configured token domain.
+      - eval_time: 6m
+        alertname: RelayTokenImplementationUnavailable
+        exp_alerts:
+          - exp_labels: {severity: critical, token: USDC}
+            exp_annotations:
+              summary: Token implementation is unverified, changed or stale
+              description: All authorization modes are held; review proxy, slot and implementation evidence before editing pins.
+      - eval_time: 6m
+        alertname: RelayUnready
+        exp_alerts:
+          - exp_labels: {severity: critical, job: gasless-relay-readiness}
+            exp_annotations:
+              summary: Relay is not ready
+              description: Inspect private readiness reasons and structured ALERT logs, including gas budget and implementation verification failures.
+  - name: The RPC history alert waits for two failed checks in a row (one check every 10 minutes)
+    interval: 1m
+    input_series:
+      # One failed check, cleared by the next; then failed checks from minute 11 on.
+      - series: relay_rpc_history_unavailable{rpc="2"}
+        values: '1+0x9 0 1+0x25'
+    alert_rule_test:
+      - {eval_time: 9m, alertname: RelayRpcHistoryUnavailable, exp_alerts: []}
+      - {eval_time: 25m, alertname: RelayRpcHistoryUnavailable, exp_alerts: []}
+      - eval_time: 26m
+        alertname: RelayRpcHistoryUnavailable
+        exp_alerts:
+          - exp_labels: {severity: warning, rpc: '2'}
+            exp_annotations:
+              summary: An RPC does not serve the state of older blocks the relay needs
+              description: Decisions that locate the use of an intent nonce wait. Replace the RPC at this position in RELAY_RPC_URLS with one that serves the history window.
+  - name: The head lag alert waits out a short lag and names the RPC
+    interval: 1m
+    input_series:
+      - series: relay_rpc_head_lag_blocks{rpc="1"}
+        values: '0+0x12'
+      # 30 blocks behind for one minute, current again; then 30 blocks behind from minute 6 on.
+      - series: relay_rpc_head_lag_blocks{rpc="2"}
+        values: '5 5 30 0 0 0 30+0x6'
+    alert_rule_test:
+      - {eval_time: 3m, alertname: RelayRpcHeadLagging, exp_alerts: []}
+      - {eval_time: 7m, alertname: RelayRpcHeadLagging, exp_alerts: []}
+      - eval_time: 8m
+        alertname: RelayRpcHeadLagging
+        exp_alerts:
+          - exp_labels: {severity: warning, rpc: '2'}
+            exp_annotations:
+              summary: An RPC's head is behind the other configured RPCs
+              description: The relay judges deadlines by the head of the first RPC in RELAY_RPC_URLS that answers; a lagging one makes it keep or send requests past their deadline. Replace the RPC at this position or move it behind a current one.
+  - name: Budget threshold observes its hold time and clears below the threshold
+    interval: 1m
+    input_series:
+      - series: relay_gas_exposure_pol
+        values: '0.8 0.8 0.79 0.79'
+      - series: relay_gas_budget_pol
+        values: '1+0x3'
+    alert_rule_test:
+      - {eval_time: 0m, alertname: RelayGasBudgetNearLimit, exp_alerts: []}
+      - eval_time: 1m
+        alertname: RelayGasBudgetNearLimit
+        exp_alerts:
+          - exp_labels: {severity: warning}
+            exp_annotations:
+              summary: Relay lifetime gas exposure exceeds 80% of its operator ceiling
+              description: Review receipts, losses and outstanding nonces before authorizing any increase. Do not delete or reset the database.
+      - {eval_time: 2m, alertname: RelayGasBudgetNearLimit, exp_alerts: []}
+      - {eval_time: 1m, alertname: RelayGasBudgetReached, exp_alerts: []}

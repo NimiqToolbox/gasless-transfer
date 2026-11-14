@@ -1,0 +1,20 @@
+{
+  "chainId": 137,
+  "reviewedBlock": "94580353",
+  "tokens": [
+    {
+      "address": "0x3c499c542cEF5E3811e1192ce70d8cC03d5c3359",
+      "proxyCodeHash": "0x7dbf0ee7d6d69b563891ceb7056cf0ff0fa09d21a48e5f812d89981c2ef95944",
+      "implementationSlot": "0x7050c9e0f4ca769c69bd3a8ef740bc37934f8e2c036e5a723fd8ee048ed3f8c3",
+      "implementationAddress": "0x235ae97b28466db30469b89a9fe4cff0659f82cb",
+      "implementationCodeHash": "0x39ec98a4509fb2d4380a9cd4623e7b20cf651cb58edb8d8332bfad9c3d698143"
+    },
+    {
+      "address": "0xc2132D05D31c914a87C6611C10748AEb04B58e8F",
+      "proxyCodeHash": "0x8cb0cfc9b3aa516d8c5a1cdf94a2c60b668a903e21711cb6f3f3501fdd8478b5",
+      "implementationSlot": "0xbaab7dbf64751104133af04abc7d9979f0fda3b059a322a8333f533d3f32bf7f",
+      "implementationAddress": "0x90040487a6c9f949c4f07cadcfb0f3b8eeab4229",
+      "implementationCodeHash": "0x6d850049a76c4c4f44783ddfe28b88984e7301767c363105afe4e18908b1d056"
+    }
+  ]
+}

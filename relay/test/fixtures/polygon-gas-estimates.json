@@ -1,0 +1,110 @@
+{
+  "source": "polygon-rpc-state-overrides@94503409",
+  "blockHash": "0x3c795556981b02620b52c1efc1743817a3b8ed55a111284f04cadb90f3abc86e",
+  "cases": [
+    {
+      "route": "USDC permit",
+      "mode": "permit",
+      "phase": "fresh",
+      "localEstimate": "210241",
+      "polygonEstimate": "250295",
+      "recommended": "275325"
+    },
+    {
+      "route": "USDC permit",
+      "mode": "permit",
+      "phase": "reused",
+      "localEstimate": "158909",
+      "polygonEstimate": "197400",
+      "recommended": "217140"
+    },
+    {
+      "route": "USDC permit",
+      "mode": "permit",
+      "phase": "front-run",
+      "localEstimate": "148065",
+      "polygonEstimate": "197198",
+      "recommended": "216918"
+    },
+    {
+      "route": "USDC allowance",
+      "mode": "none",
+      "phase": "fresh",
+      "localEstimate": "152147",
+      "polygonEstimate": "186879",
+      "recommended": "205567"
+    },
+    {
+      "route": "USDC allowance",
+      "mode": "none",
+      "phase": "reused",
+      "localEstimate": "117947",
+      "polygonEstimate": "151899",
+      "recommended": "167089"
+    },
+    {
+      "route": "USDT0 permit",
+      "mode": "permit",
+      "phase": "fresh",
+      "localEstimate": "207837",
+      "polygonEstimate": "245145",
+      "recommended": "269660"
+    },
+    {
+      "route": "USDT0 permit",
+      "mode": "permit",
+      "phase": "reused",
+      "localEstimate": "156289",
+      "polygonEstimate": "190068",
+      "recommended": "209075"
+    },
+    {
+      "route": "USDT0 permit",
+      "mode": "permit",
+      "phase": "front-run",
+      "localEstimate": "141380",
+      "polygonEstimate": "181360",
+      "recommended": "199496"
+    },
+    {
+      "route": "USDT0 meta-approval",
+      "mode": "metaTxApprove",
+      "phase": "fresh",
+      "localEstimate": "214844",
+      "polygonEstimate": "252318",
+      "recommended": "277550"
+    },
+    {
+      "route": "USDT0 meta-approval",
+      "mode": "metaTxApprove",
+      "phase": "reused",
+      "localEstimate": "163272",
+      "polygonEstimate": "197217",
+      "recommended": "216939"
+    },
+    {
+      "route": "USDT0 meta-approval",
+      "mode": "metaTxApprove",
+      "phase": "front-run",
+      "localEstimate": "139711",
+      "polygonEstimate": "180505",
+      "recommended": "198556"
+    },
+    {
+      "route": "USDT0 allowance",
+      "mode": "none",
+      "phase": "fresh",
+      "localEstimate": "157467",
+      "polygonEstimate": "189880",
+      "recommended": "208868"
+    },
+    {
+      "route": "USDT0 allowance",
+      "mode": "none",
+      "phase": "reused",
+      "localEstimate": "122995",
+      "polygonEstimate": "152860",
+      "recommended": "168146"
+    }
+  ]
+}

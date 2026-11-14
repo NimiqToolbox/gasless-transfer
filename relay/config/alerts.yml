@@ -1,0 +1,73 @@
+groups:
+  - name: gasless-relay-operations
+    rules:
+      - alert: RelayMonitoringUnavailable
+        expr: up{job=~"gasless-relay|gasless-relay-readiness"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: Relay metrics or readiness probe cannot be scraped
+          description: Check the relay, blackbox exporter and private monitoring network. Missing scrapes must not look healthy.
+      - alert: RelayGasBudgetNearLimit
+        expr: relay_gas_exposure_pol / relay_gas_budget_pol >= 0.8
+        for: 1m
+        labels:
+          severity: warning
+        annotations:
+          summary: Relay lifetime gas exposure exceeds 80% of its operator ceiling
+          description: Review receipts, losses and outstanding nonces before authorizing any increase. Do not delete or reset the database.
+      - alert: RelayGasBudgetReached
+        expr: relay_gas_exposure_pol >= relay_gas_budget_pol
+        labels:
+          severity: critical
+        annotations:
+          summary: Relay lifetime gas ceiling has been reached
+          description: Additional exposure is refused. Reconciliation and already-budgeted broadcasts may continue.
+      - alert: RelayRevertedCallLoss
+        expr: increase(relay_reverted_call_gas_pol_total[5m]) > 0.01
+        labels:
+          severity: warning
+        annotations:
+          summary: Relay paid more than 0.01 POL for reverted calls in five minutes
+          description: Check sender activity, token administration and gas behavior. This rate metric can reset on restart; the durable gas ceiling cannot.
+      - alert: RelayTokenDomainMismatch
+        expr: relay_token_domain_mismatch > 0
+        labels:
+          severity: critical
+        annotations:
+          summary: Token authorization domain differs from reviewed configuration
+          description: Investigate issuer changes before updating the configured token domain.
+      - alert: RelayTokenImplementationUnavailable
+        expr: relay_token_implementation_unavailable > 0
+        labels:
+          severity: critical
+        annotations:
+          summary: Token implementation is unverified, changed or stale
+          description: All authorization modes are held; review proxy, slot and implementation evidence before editing pins.
+      - alert: RelayRpcHistoryUnavailable
+        expr: relay_rpc_history_unavailable > 0
+        # Two failed checks in a row (RELAY_RPC_HISTORY_CHECK_SECONDS, default 600) before it fires.
+        for: 15m
+        labels:
+          severity: warning
+        annotations:
+          summary: An RPC does not serve the state of older blocks the relay needs
+          description: Decisions that locate the use of an intent nonce wait. Replace the RPC at this position in RELAY_RPC_URLS with one that serves the history window.
+      - alert: RelayRpcHeadLagging
+        # 5 Polygon blocks are about RELAY_MIN_SECONDS_TO_BROADCAST (default 10 s); 2 minutes outlast a provider hiccup.
+        expr: relay_rpc_head_lag_blocks > 5
+        for: 2m
+        labels:
+          severity: warning
+        annotations:
+          summary: An RPC's head is behind the other configured RPCs
+          description: The relay judges deadlines by the head of the first RPC in RELAY_RPC_URLS that answers; a lagging one makes it keep or send requests past their deadline. Replace the RPC at this position or move it behind a current one.
+      - alert: RelayUnready
+        expr: probe_success{job="gasless-relay-readiness"} == 0
+        for: 1m
+        labels:
+          severity: critical
+        annotations:
+          summary: Relay is not ready
+          description: Inspect private readiness reasons and structured ALERT logs, including gas budget and implementation verification failures.

@@ -1,5 +1,26 @@
+# secrets and local config
+.env
+.env.*
+!.env.example
+*.pem
+*.p12
+*.pfx
+*.key
+/secrets/
+
+# build output
+node_modules/
+dist/
+/build/
+coverage/
 contracts/lib/
 contracts/out/
 contracts/cache/
 contracts/broadcast/
-.env
+contracts/.deps.*/
+
+# runtime data
+relay/data/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm

@@ -1,0 +1,44 @@
+{
+  "name": "@nimiq/gasless-sdk",
+  "version": "0.2.0",
+  "description": "Typed data, pins, relay client and viem helpers for gasless USDC/USDT0 transfers on Polygon",
+  "license": "MIT",
+  "type": "module",
+  "sideEffects": false,
+  "files": ["dist"],
+  "exports": {
+    "./core": {
+      "import": { "types": "./dist/core/index.d.ts", "default": "./dist/core/index.js" },
+      "require": { "types": "./dist/core/index.d.cts", "default": "./dist/core/index.cjs" }
+    },
+    "./relay": {
+      "import": { "types": "./dist/relay/index.d.ts", "default": "./dist/relay/index.js" },
+      "require": { "types": "./dist/relay/index.d.cts", "default": "./dist/relay/index.cjs" }
+    },
+    "./viem": {
+      "import": { "types": "./dist/viem/index.d.ts", "default": "./dist/viem/index.js" },
+      "require": { "types": "./dist/viem/index.d.cts", "default": "./dist/viem/index.cjs" }
+    }
+  },
+  "scripts": {
+    "build": "tsup",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  },
+  "peerDependencies": {
+    "viem": "^2.30.0"
+  },
+  "peerDependenciesMeta": {
+    "viem": { "optional": true }
+  },
+  "devDependencies": {
+    "@types/node": "24.13.6",
+    "ethers5": "npm:ethers@5.8.0",
+    "ethers6": "npm:ethers@6.17.0",
+    "tsup": "8.5.1",
+    "typescript": "5.9.3",
+    "viem": "2.56.9",
+    "vite": "8.3.5",
+    "vitest": "4.1.12"
+  }
+}

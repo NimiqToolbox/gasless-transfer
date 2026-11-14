@@ -1,0 +1,28 @@
+# For operator-managed monitoring on the Linux host. Adapt addresses if monitoring is remote;
+# keep metrics and readiness behind a private authenticated network, never the public API proxy.
+global:
+  scrape_interval: 15s
+  evaluation_interval: 15s
+rule_files:
+  - /etc/prometheus/gasless-alerts.yml
+alerting:
+  alertmanagers:
+    - static_configs:
+        - targets: ['127.0.0.1:9093']
+scrape_configs:
+  - job_name: gasless-relay
+    static_configs:
+      - targets: ['127.0.0.1:9464']
+  - job_name: gasless-relay-readiness
+    metrics_path: /probe
+    params:
+      module: [http_2xx]
+    static_configs:
+      - targets: ['http://127.0.0.1:9464/readyz']
+    relabel_configs:
+      - source_labels: [__address__]
+        target_label: __param_target
+      - source_labels: [__param_target]
+        target_label: instance
+      - target_label: __address__
+        replacement: '127.0.0.1:9115'

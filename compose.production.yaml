@@ -1,0 +1,67 @@
+# Linux single-writer relay. Operator-owned files/volume are mandatory; this never creates a key.
+# Pin RELAY_IMAGE by digest; see docs/operations/linux-relay.md.
+name: gasless-production
+services:
+  relay:
+    image: ${RELAY_IMAGE:?Set the reviewed relay image including @sha256 digest}
+    init: true
+    user: '1000:1000'
+    read_only: true
+    cap_drop: [ALL]
+    security_opt: [no-new-privileges:true]
+    cpus: 2
+    mem_limit: 1g
+    memswap_limit: 1g
+    pids_limit: 128
+    # No core dumps: a dump of the relay would contain its key.
+    ulimits:
+      core: 0
+    restart: unless-stopped
+    stop_grace_period: 60s
+    env_file:
+      - path: ${RELAY_ENV_FILE:?Set the absolute operator-owned environment file path}
+        format: raw
+    environment:
+      NODE_ENV: production
+      RELAY_HOST: 0.0.0.0
+      RELAY_PORT: '8080'
+      # Both ports below are host-loopback only. The public API requires an operator TLS proxy.
+      RELAY_OPS_HOST: 0.0.0.0
+      RELAY_OPS_PORT: '9464'
+      RELAY_PRIVATE_KEY_FILE: /run/secrets/relay_key
+      RELAY_DB_PATH: /data/relay.sqlite
+      RELAY_DEPLOYMENT_FILE: /app/deployments/137.json
+      RELAY_TOKEN_PINS_FILE: /app/config/token-pins.polygon-137.json
+      RELAY_GAS_TABLE_FILE: /app/config/gasTable.json
+    ports:
+      - '127.0.0.1:8080:8080'
+      - '127.0.0.1:9464:9464'
+    tmpfs:
+      - /tmp:rw,nosuid,nodev,noexec,size=64m,mode=1777
+    volumes:
+      - state:/data
+      - type: bind
+        source: ${RELAY_KEY_FILE:?Set the absolute operator-owned runtime signer file path}
+        target: /run/secrets/relay_key
+        read_only: true
+        bind: {create_host_path: false}
+      - type: bind
+        source: ${RELAY_DEPLOYMENT_JSON:?Set the reviewed deployments/137.json absolute path}
+        target: /app/deployments/137.json
+        read_only: true
+        bind: {create_host_path: false}
+    healthcheck:
+      # Liveness only: unready service must stay alive to reconcile already broadcast transactions.
+      test: ['CMD', 'node', '-e', 'fetch("http://127.0.0.1:8080/healthz", {signal: AbortSignal.timeout(3000)}).then(r => process.exit(r.ok ? 0 : 1)).catch(() => process.exit(1))']
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 60s
+    logging:
+      driver: local
+      options: {max-size: 10m, max-file: '5'}
+volumes:
+  state:
+    # Explicit external ownership keeps `compose down -v` from deleting transaction/exposure history.
+    external: true
+    name: ${RELAY_STATE_VOLUME:?Set the existing dedicated relay state volume name}
