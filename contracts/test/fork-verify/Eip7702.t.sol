@@ -35,6 +35,19 @@ contract VfAcceptAllDelegate {
     }
 }
 
+/// @notice A griefing delegate: ERC-1271 validation burns (almost) all gas it is given, then answers "invalid".
+///         The relay's fault tests (relay/test/fault) deploy it to measure what a sender who delegates to it
+///         after broadcast can cost the relay.
+contract VfGasBurnerDelegate {
+    function isValidSignature(bytes32, bytes calldata) external view returns (bytes4) {
+        uint256 x;
+        while (gasleft() > 5000) {
+            x = uint256(keccak256(abi.encode(x)));
+        }
+        return x == 0 ? bytes4(0) : bytes4(0xffffffff);
+    }
+}
+
 /// @notice Delegated-account token authorization against real USDC and USDT0 at block 94,421,000.
 ///         USDC uses delegate ERC-1271 checks; USDT0 uses ecrecover. Tests use the Prague EVM rules.
 contract Eip7702Test is VerForkBase {
