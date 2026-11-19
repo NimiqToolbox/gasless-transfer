@@ -65,6 +65,15 @@ describe('T36: log redaction', () => {
         expect(text()).toContain('0x70997970C51812dc3A010C7d01b50e0d17dc79C8');
     });
 
+    it('writes the level as its name, which log platforms map to a severity', () => {
+        const { logger, lines } = captureLogger();
+        logger.info('i');
+        logger.warn('w');
+        logger.error('e');
+        logger.fatal('f');
+        expect(lines.map((l) => (JSON.parse(l) as { level: unknown }).level)).toEqual(['info', 'warn', 'error', 'fatal']);
+    });
+
     it('serializes viem errors without call data, raw transactions or RPC URLs', () => {
         const { logger, text } = captureLogger();
         const cause = new BaseError('execution reverted', { details: `execution reverted: custom error ${CALLDATA}` });

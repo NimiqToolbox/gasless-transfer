@@ -70,6 +70,10 @@ Alertmanager and a blackbox exporter with the `http_2xx` module. Copy the
 [rules](../../relay/config/alerts.yml) to its configured rules path. For remote monitoring, adapt
 addresses through a private authenticated connection. No notification destination is embedded.
 
+Without such a stack, or next to it, the relay's [alert monitor](../../relay/README.md#alert-monitoring) can post
+balance, readiness, degradation and error alerts to a chat webhook (`RELAY_ALERT_WEBHOOK_URL`; the container then
+needs outbound HTTPS to that host). It cannot report a stopped or hung process, so keep an availability probe.
+
 | Signal | Required response |
 |---|---|
 | Domain/implementation mismatch | Hold new transfers; verify with independent providers, review issuer changes and rerun all affected routes before updating pins. |

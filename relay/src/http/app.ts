@@ -75,7 +75,8 @@ const zFeeQuery = z.strictObject({
 
 const zRequestParams = z.strictObject({ id: z.string().regex(BYTES32_RE) });
 
-const QUIET_ROUTES = new Set(['/healthz', '/readyz', '/metrics']);
+/** Probe routes: not logged per request, and their answers (a 503 from /readyz) are not counted as HTTP errors in alerts. */
+export const QUIET_ROUTES: ReadonlySet<string> = new Set(['/healthz', '/readyz', '/metrics']);
 
 /**
  * Node enforces requestTimeout and headersTimeout only when it sweeps its connections, every

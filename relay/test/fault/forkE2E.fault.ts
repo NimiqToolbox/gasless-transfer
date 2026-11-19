@@ -69,7 +69,7 @@ async function settle(t: SignedTransfer): Promise<void> {
     }
     errors.push(await tick(relay));
     const failed = errors.filter((e) => e !== undefined);
-    const warnings = relay.logs.lines.filter((l) => /"level":(40|50)/.test(l)).slice(-5);
+    const warnings = relay.logs.lines.filter((l) => /"level":"(warn|error)"/.test(l)).slice(-5);
     if (failed.length > 0) console.log('settle: pass errors', failed, warnings.map((w) => w.slice(0, 400)));
 }
 

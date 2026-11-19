@@ -239,8 +239,8 @@ describe('at runtime: degraded and the ALERT while an RPC fails the check', () =
         chain.finalized = 19_936n;
         let pruned = false;
         chain.rpcClients = () => [chain.rpcView(), prunedView(chain, () => 19_000n, () => pruned)];
-        // ALERT lines are errors (level 50).
-        const alerts = () => h!.logs.lines.filter((l) => l.includes('"alert":"rpc_history"') && l.includes('"level":50')).length;
+        // ALERT lines are errors.
+        const alerts = () => h!.logs.lines.filter((l) => l.includes('"alert":"rpc_history"') && l.includes('"level":"error"')).length;
 
         await h.relay.rpcHistory.check();
         expect(await h.relay.readiness()).toMatchObject({ ready: true, degraded: false, checks: { rpcHistory: { ok: true, window: '15924', failures: [] } } });
@@ -298,7 +298,7 @@ describe('at runtime: degraded and the ALERT while an RPC fails the check', () =
                 },
             },
         ];
-        const alerts = () => h!.logs.lines.filter((l) => l.includes('"alert":"rpc_history"') && l.includes('"level":50')).length;
+        const alerts = () => h!.logs.lines.filter((l) => l.includes('"alert":"rpc_history"') && l.includes('"level":"error"')).length;
         const gauge = async () => ((await h!.metrics.registry.metrics()).match(/relay_rpc_history_unavailable\{rpc="2"\} (\d)/) ?? [])[1];
 
         for (const blip of ['no head', 'timeout'] as const) {

@@ -840,7 +840,7 @@ export class TxManager {
         const stale = age > HEAD_STALE_AFTER_SECONDS ? age : undefined;
         if (stale !== undefined && this.staleHeadSeconds === undefined) {
             this.deps.logger.warn(
-                { head: head.number, ageSeconds: age },
+                { alert: 'head_stale', head: head.number, ageSeconds: age },
                 'ALERT: the head block of the relay\'s RPC is old (the RPC or the chain stands still); no queued request is sent until it moves. Check the first RPC in RELAY_RPC_URLS',
             );
         } else if (stale === undefined && this.staleHeadSeconds !== undefined) {
@@ -1084,7 +1084,7 @@ export class TxManager {
         wait.alerted = true;
         this.txm.decisionWaits.inc({ decision });
         this.deps.logger.error(
-            { requestId: request.id, decision, blocks, why },
+            { alert: 'decision_wait', requestId: request.id, decision, blocks, why },
             `ALERT: request ${request.id} has waited ${blocks} blocks for a decision (${decision}): ${why}. Check the RPCs in RELAY_RPC_URLS`,
         );
     }
@@ -2426,7 +2426,7 @@ export class TxManager {
             case 'insufficient_funds':
                 this.lowFunds = true;
                 this.resend.add(request.id);
-                this.deps.logger.error({ requestId: request.id }, 'ALERT: relay account has insufficient POL');
+                this.deps.logger.error({ alert: 'insufficient_funds', requestId: request.id }, 'ALERT: relay account has insufficient POL');
                 break;
             case 'underpriced':
             case 'error':
@@ -2749,7 +2749,7 @@ export class TxManager {
         const hash = keccak256(raw);
         this.fillers.set(nonce, { nonce, hash, raw, ...fees, sentBlock: head.number });
         this.txm.nonceEvents.inc({ event: 'gap_filled' });
-        logger.warn({ txNonce: nonce, txHash: hash }, 'ALERT: filling an unused relay nonce with a 0-value self-transfer');
+        logger.warn({ alert: 'nonce_filler', txNonce: nonce, txHash: hash }, 'ALERT: filling an unused relay nonce with a 0-value self-transfer');
         const outcome = await this.broadcastWithinBudget(raw);
         metrics.txBroadcasts.inc({ kind: 'filler', outcome: outcome.kind });
         if (outcome.kind === 'accepted' || outcome.kind === 'known') this.progress();
@@ -2987,7 +2987,7 @@ export class TxManager {
         } else if (outcome.kind === 'insufficient_funds') {
             this.lowFunds = true;
             this.resend.add(request.id);
-            logger.error({ requestId: request.id }, 'ALERT: relay account has insufficient POL');
+            logger.error({ alert: 'insufficient_funds', requestId: request.id }, 'ALERT: relay account has insufficient POL');
             return 'stop';
         } else if (outcome.kind === 'underpriced' || outcome.kind === 'error') {
             this.resend.add(request.id);

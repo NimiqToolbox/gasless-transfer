@@ -64,6 +64,8 @@ export function createLogger(settings: LoggerSettings = {}, destination?: Destin
         redact: { paths: [...REDACT_PATHS], censor: REDACTED },
         serializers: { err: serializeError, error: serializeError },
         formatters: {
+            // The level as its name ("warn", "error"): log platforms map a numeric pino level (40, 50) to info.
+            level: (label) => ({ level: label }),
             log: (object) => scrubDeep(object) as Record<string, unknown>,
         },
         hooks: {

@@ -25,6 +25,7 @@ import type { Logger } from './logger.js';
 import { createMetrics, type RelayMetrics } from './metrics.js';
 import { transferOperation } from './operations/transfer.js';
 import { OperationRegistry, type RelayContext } from './operations/types.js';
+import { AlertMonitor, type AlertSend } from './ops/alertMonitor.js';
 import { RpcHistoryMonitor, historyWindowOf, type RpcHistory } from './ops/rpcHistory.js';
 import { TokenImplementationMonitor, type TokenImplementationPins } from './ops/tokenImplementationMonitor.js';
 import { TokenDomainMonitor, type TokenDomainReading } from './ops/tokenDomainMonitor.js';
@@ -56,6 +57,10 @@ export interface RelaySettings {
     readonly feeMarginBps: number;
     readonly feeCacheMs: number;
     readonly minPolBalanceWei: bigint;
+    /** RELAY_ALERT_POL_BALANCE: the alert monitor's warning level (default 2 × minPolBalanceWei). */
+    readonly alertPolBalanceWei?: bigint;
+    /** Where the alert monitor posts its messages (RELAY_ALERT_WEBHOOK_URL); without it, alerts are only logged. */
+    readonly alertSend?: AlertSend;
     readonly recipientDenylist: readonly Address[];
     /** Transaction-manager settings; the policy fields (src/tx/settings.ts) take their defaults when absent. */
     readonly tx: TxManagerSettings & Partial<TxPolicySettings>;
@@ -109,6 +114,8 @@ export interface Relay {
     readonly tokenImplementations?: TokenImplementationMonitor | undefined;
     /** Checks that every RPC serves the state of older blocks; started by startServer. */
     readonly rpcHistory: RpcHistoryMonitor;
+    /** Turns readiness and error counters into alert messages; started by startServer. */
+    readonly alerts: AlertMonitor;
     /** Cached readiness, as served by /readyz on both listeners. */
     readiness(): Promise<ReadinessReport>;
     close(): Promise<void>;
@@ -255,6 +262,17 @@ export async function createRelay(deps: RelayDeps): Promise<Relay> {
         clock,
         settings.readinessCacheMs ?? DEFAULT_READINESS_CACHE_MS,
     );
+    const alerts = new AlertMonitor({
+        readiness,
+        metrics,
+        clock,
+        logger,
+        chainId: ctx.chainId,
+        relay: ctx.relay,
+        minBalanceWei: settings.minPolBalanceWei,
+        warnBalanceWei: settings.alertPolBalanceWei ?? 2n * settings.minPolBalanceWei,
+        send: settings.alertSend,
+    });
     const app = await createApp({
         ctx,
         registry,
@@ -284,8 +302,10 @@ export async function createRelay(deps: RelayDeps): Promise<Relay> {
         tokenDomains,
         tokenImplementations,
         rpcHistory,
+        alerts,
         readiness,
         async close() {
+            await alerts.stop();
             await Promise.all([app.close(), opsApp.close()]);
             await tokenDomains.stop();
             await rpcHistory.stop();

@@ -89,6 +89,32 @@ describe('environment', () => {
         expect(() => loadConfig({ ...baseEnv, RELAY_POLUSD_FEED: 'none' })).toThrow(/RELAY_POLUSD_FEED must be "default" or a feed address/);
     });
 
+    it('reads the alert settings: a warning level at or above the minimum, an https webhook URL that is never echoed', () => {
+        const defaults = loadConfig({ ...baseEnv, RELAY_MIN_POL_BALANCE: '0.25' });
+        expect(defaults.alertPolBalanceWei).toBe(5n * 10n ** 17n);
+        expect(defaults.alertWebhookUrl).toBeUndefined();
+
+        const url = 'https://hooks.example/services/FAKE_TOKEN';
+        const set = loadConfig({ ...baseEnv, RELAY_MIN_POL_BALANCE: '0.25', RELAY_ALERT_POL_BALANCE: '2', RELAY_ALERT_WEBHOOK_URL: url });
+        expect(set.alertPolBalanceWei).toBe(2n * 10n ** 18n);
+        expect(set.alertWebhookUrl).toBe(url);
+        expect(set.unreadVariables).toEqual([]);
+        expect(loadConfig({ ...baseEnv, RELAY_MIN_POL_BALANCE: '0.25', RELAY_ALERT_POL_BALANCE: '0.25' }).alertPolBalanceWei).toBe(25n * 10n ** 16n);
+
+        expect(() => loadConfig({ ...baseEnv, RELAY_MIN_POL_BALANCE: '0.25', RELAY_ALERT_POL_BALANCE: '0.2' })).toThrow(/must not be below RELAY_MIN_POL_BALANCE/);
+        expect(() => loadConfig({ ...baseEnv, RELAY_ALERT_POL_BALANCE: '-1' })).toThrow(/RELAY_ALERT_POL_BALANCE must be a decimal POL amount/);
+        for (const bad of ['http://hooks.example/services/FAKE_TOKEN', 'hooks.example/FAKE_TOKEN', 'wss://hooks.example/FAKE_TOKEN']) {
+            const load = (): unknown => loadConfig({ ...baseEnv, RELAY_ALERT_WEBHOOK_URL: bad });
+            expect(load).toThrow(/^RELAY_ALERT_WEBHOOK_URL must be an https URL$/);
+            expect(load).not.toThrow(/FAKE_TOKEN/);
+        }
+        for (const bad of ['https://user:FAKE_TOKEN@hooks.example/services', 'https://FAKE_TOKEN@hooks.example/services']) {
+            const load = (): unknown => loadConfig({ ...baseEnv, RELAY_ALERT_WEBHOOK_URL: bad });
+            expect(load).toThrow(/^RELAY_ALERT_WEBHOOK_URL must not contain a user name or password$/);
+            expect(load).not.toThrow(/FAKE_TOKEN/);
+        }
+    });
+
     it('names missing or invalid variables and never echoes RPC URLs', () => {
         for (const name of Object.keys(baseEnv)) {
             const env: Record<string, string> = { ...baseEnv };

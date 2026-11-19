@@ -177,6 +177,10 @@ export interface RelayConfig {
     readonly feeCacheMs: number;
     readonly feeMarginBps: number;
     readonly minPolBalanceWei: bigint;
+    /** RELAY_ALERT_POL_BALANCE: below it the alert monitor warns (ops/alertMonitor.ts); default 2 × the minimum. */
+    readonly alertPolBalanceWei: bigint;
+    /** RELAY_ALERT_WEBHOOK_URL: where the alert monitor posts its messages; unset = alerts are only logged. */
+    readonly alertWebhookUrl?: string | undefined;
     readonly recipientDenylist: readonly Address[];
     readonly tx: TxManagerSettings & TxPolicySettings;
 }
@@ -306,6 +310,20 @@ export function loadConfig(processEnv: Env): RelayConfig {
     }
     const minPol = raw(env, 'RELAY_MIN_POL_BALANCE') ?? '1';
     if (!/^[0-9]+(\.[0-9]{1,18})?$/.test(minPol)) throw new ConfigError('RELAY_MIN_POL_BALANCE must be a decimal POL amount');
+    const minPolBalanceWei = parseEther(minPol);
+    // The warning level of the balance alert: above the readiness minimum, so that there is time to top up.
+    const alertPol = raw(env, 'RELAY_ALERT_POL_BALANCE');
+    if (alertPol !== undefined && !/^[0-9]+(\.[0-9]{1,18})?$/.test(alertPol)) throw new ConfigError('RELAY_ALERT_POL_BALANCE must be a decimal POL amount');
+    const alertPolBalanceWei = alertPol === undefined ? 2n * minPolBalanceWei : parseEther(alertPol);
+    if (alertPolBalanceWei < minPolBalanceWei) throw new ConfigError('RELAY_ALERT_POL_BALANCE must not be below RELAY_MIN_POL_BALANCE');
+    const alertWebhookUrl = raw(env, 'RELAY_ALERT_WEBHOOK_URL');
+    // Never echo the URL: a chat webhook URL is a credential. fetch refuses URLs with a user name or password, so every
+    // alert would fail to send.
+    if (alertWebhookUrl !== undefined) {
+        const url = URL.canParse(alertWebhookUrl) ? new URL(alertWebhookUrl) : undefined;
+        if (url?.protocol !== 'https:') throw new ConfigError('RELAY_ALERT_WEBHOOK_URL must be an https URL');
+        if (url.username !== '' || url.password !== '') throw new ConfigError('RELAY_ALERT_WEBHOOK_URL must not contain a user name or password');
+    }
 
     const logLevel = raw(env, 'RELAY_LOG_LEVEL') ?? 'info';
     if (!['fatal', 'error', 'warn', 'info', 'debug', 'trace', 'silent'].includes(logLevel)) {
@@ -390,7 +408,9 @@ export function loadConfig(processEnv: Env): RelayConfig {
         priceCacheMs: integer(env, 'RELAY_PRICE_CACHE_SECONDS', 30, 0, 3600) * 1000,
         feeCacheMs: integer(env, 'RELAY_FEE_CACHE_MS', 2000, 0, 60_000),
         feeMarginBps: integer(env, 'RELAY_FEE_MARGIN_BPS', 1000, 0, 10_000),
-        minPolBalanceWei: parseEther(minPol),
+        minPolBalanceWei,
+        alertPolBalanceWei,
+        alertWebhookUrl,
         recipientDenylist: denylist,
         tx: {
             totalGasBudgetWei: parseEther(totalGasBudget),

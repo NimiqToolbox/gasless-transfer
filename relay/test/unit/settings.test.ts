@@ -235,10 +235,10 @@ describe('private key file permissions', () => {
             expect(privateKeyFileMode(file)).toBe(mode);
             const logs = captureLogger();
             warnIfKeyFileExposed(file, logs.logger);
-            const lines = logs.lines.map((l) => JSON.parse(l) as { level: number; msg: string; mode?: string });
+            const lines = logs.lines.map((l) => JSON.parse(l) as { level: string; msg: string; mode?: string });
             if (warns) {
                 expect(lines).toHaveLength(1);
-                expect(lines[0]).toMatchObject({ level: 40, mode: `0${mode.toString(8)}` });
+                expect(lines[0]).toMatchObject({ level: 'warn', mode: `0${mode.toString(8)}` });
                 expect(lines[0]!.msg).toContain('readable by other users');
             } else {
                 expect(lines).toEqual([]);

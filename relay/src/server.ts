@@ -20,6 +20,7 @@ import {
 } from './config.js';
 import type { Logger } from './logger.js';
 import { createMetrics } from './metrics.js';
+import { webhookSender } from './ops/alertMonitor.js';
 import { historyWindowOf, verifyRpcHistory } from './ops/rpcHistory.js';
 import { RpcUsage } from './ops/rpcUsage.js';
 import { loadTokenImplementationPins } from './ops/tokenImplementationMonitor.js';
@@ -143,6 +144,8 @@ export async function startServer(config: RelayConfig, logger: Logger): Promise<
                 feeMarginBps: config.feeMarginBps,
                 feeCacheMs: config.feeCacheMs,
                 minPolBalanceWei: config.minPolBalanceWei,
+                alertPolBalanceWei: config.alertPolBalanceWei,
+                ...(config.alertWebhookUrl ? { alertSend: webhookSender(config.alertWebhookUrl) } : {}),
                 recipientDenylist: config.recipientDenylist,
                 tx: config.tx,
                 readinessCacheMs: config.readinessCacheMs,
@@ -160,6 +163,7 @@ export async function startServer(config: RelayConfig, logger: Logger): Promise<
             relay.tokenImplementations?.start();
             relay.rpcHistory.start(config.rpcHistoryCheckMs);
             rpcUsage.start(config.rpcUsageLogMs);
+            relay.alerts.start();
             // The internal listener first: if its port is taken, the relay stops before it takes traffic.
             const opsAddress = config.ops ? await relay.opsApp.listen({ host: config.ops.host, port: config.ops.port }) : null;
             const address = await relay.app.listen({ host: config.host, port: config.port });

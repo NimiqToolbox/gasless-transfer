@@ -126,7 +126,7 @@ A sender (`request.from`) has at most one request queued or in flight, across to
 | `RELAY_FEE_CACHE_MS` | `2000` | 0–60000 | How long base fee and tip data are reused, measured on the monotonic clock. Pricing is checked separately through the oracle cache. |
 | `RELAY_FEE_MARGIN_BPS` | `1000` | 0–10000 | Quote margin in basis points (1000 = 10%). |
 | `RELAY_MIN_TIP_GWEI` | `30` | decimal gwei > 0 | `MIN_TIP`: lower bound of the priority fee, for quotes and for transactions. It must be greater than 0: with 0, a chain or RPC reporting a base fee of 0 would make break-even, and with it an acceptable fee, 0. On Polygon PoS (137) and Amoy (80002) it must be at least 25, because Bor refuses lower priority fees; this is checked once the deployment file is read. |
-| `RELAY_MIN_POL_BALANCE` | `1` | decimal POL | Readiness threshold for the relay's POL balance. |
+| `RELAY_MIN_POL_BALANCE` | `1` | decimal POL | Readiness threshold for the relay's POL balance. Below it the alert monitor raises `pol_empty`. |
 | `RELAY_RECIPIENT_DENYLIST` | *(empty)* | | Extra recipient addresses to reject, comma-separated. They are added to the built-in D11 denylist: zero address, the contract, the tokens and the built-in legacy addresses. |
 
 ### Transaction manager
@@ -158,6 +158,13 @@ A sender (`request.from`) has at most one request queued or in flight, across to
 | Variable | Default | Range | Description |
 |---|---|---|---|
 | `RELAY_TOKEN_DOMAIN_CHECK_SECONDS` | `60` | 0–86400 | Interval of the token domain check (see [Monitors](#token-domain-monitoring)). `0` disables it: the readings of startup verification then stay as they are until the next restart, so a mismatch found at startup keeps the relay `degraded` (and that token's permit and meta-tx refused) until then, even if the rename is reverted, and a change while the relay runs is not noticed. |
+
+### Alert monitor
+
+| Variable | Default | Range | Description |
+|---|---|---|---|
+| `RELAY_ALERT_WEBHOOK_URL` | *(unset)* | `https` URL without user name or password | Where the [alert monitor](#alert-monitoring) posts its messages, as `{"text": "…"}` JSON (the body incoming chat webhooks accept). The URL is a credential: keep it in a secret store; the relay never logs it. Unset: alerts are only logged. |
+| `RELAY_ALERT_POL_BALANCE` | 2 × `RELAY_MIN_POL_BALANCE` | decimal POL, ≥ `RELAY_MIN_POL_BALANCE` | Warning level of the balance alert (`pol_low`): set it so that the time from this level to the minimum is enough to top up. |
 
 ## Files
 
@@ -386,6 +393,23 @@ Alert on failed readiness, persistent degradation, low POL, increasing RPC/monit
 
 Every `RELAY_RPC_USAGE_LOG_SECONDS` the relay also logs one `rpc usage` line, so that provider capacity can also be judged from the logs. For each configured RPC, by position, it reports the interval's requests, failures by reason, p50/p95/maximum latency in ms, the latest head and the largest head lag in blocks. URLs are never logged. Every RPC must confirm every token implementation check, so one provider that rate-limits holds all transfers: use endpoints with enough capacity for the relay.
 
+### Alert monitoring
+
+The relay alerts its operator itself, also where no metrics collector can reach the internal listener. Every 60 seconds (the first check one interval after startup) the alert monitor reads the readiness report (the same as `/readyz`, from its cache) and the request and HTTP counters, and derives these conditions:
+
+| Condition | Severity | When |
+|---|---|---|
+| `pol_low` | warning | The POL balance is below `RELAY_ALERT_POL_BALANCE`. |
+| `pol_empty` | critical | The POL balance is below `RELAY_MIN_POL_BALANCE` (readiness fails, but the relay keeps sending while it can pay), or a broadcast could not pay for gas (`insufficient_funds`: queued requests wait). |
+| `not_ready:<part>` | critical | A readiness check fails: `rpc` (also a failed balance read), `price`, `token_implementation`, `tx:<reason>` (the transaction manager's reasons, e.g. `tx:nonce_gap`, `tx:gas_budget`, `tx:pass_stale`, `tx:head_stale`), or `tx` when it is not ready without naming a reason. `readiness`: the report itself could not be produced; the other conditions then keep their state. |
+| `degraded:<part>` | warning | `tx:backlog`, `tx:held_at_cap`, `tx:settle_backlog`, `token_domain`, `rpc_history`. |
+| `transfers_failing` | critical | At least 3 on-chain reverts of relay calls or request expiries in the last 15 minutes (a request whose call reverts after its deadline counts twice). Failed requests do not count: most are refusals the sender caused. |
+| `http_5xx` | warning | At least 10 HTTP 5xx answers in the last 5 minutes, not counting `/healthz`, `/readyz` and `/metrics`; the message breaks them down by error code. |
+
+A condition fires after two checks in a row that see it and resolves after two in a row that do not, so a single failed read does not page anyone. While the balance cannot be read, the balance conditions keep their state; while `pol_empty` holds, `pol_low` does too, so a falling balance does not report it resolved. A condition still firing after 6 hours is posted again. Each check adds at most one message, which holds all of its transitions (`CRITICAL`, `WARNING`, `STILL …`, `RESOLVED`) under a header with the chain and the relay's shortened address. A message that could not be delivered is retried, in order, at the next check; at most 20 wait, and the oldest is dropped beyond that. On shutdown the monitor waits only for the message being posted (at most 10 seconds). The state lives in memory: after a restart, conditions that still hold fire again. The monitor cannot report a stopped or hung process: keep an external availability probe or the platform's crash notifications for that.
+
+Messages carry no client addresses, senders or request data. Every transition is also logged, with the fields `condition`, `alertState` (`firing`, `reminder`, `resolved`) and `severity`; critical conditions log at `error` when they fire and when they are posted again, the rest at `warn`.
+
 ### Token-domain monitoring
 
 The token-domain monitor reads each token's `DOMAIN_SEPARATOR()` at startup and every `RELAY_TOKEN_DOMAIN_CHECK_SECONDS`. A mismatch refuses permit/meta-transaction quotes and submissions with `unsupported_auth_mode`; existing-allowance mode and other tokens remain available. Readiness reports `degraded`, the mismatch metric is set and an alert is logged. A failed read retains the last state; a matching later reading clears it. A permanent domain change requires compatible deployment metadata and client pins. Disabling the interval retains the startup readings until restart.
@@ -405,7 +429,7 @@ window = 2 × (7200 + RELAY_UNKNOWN_NONCE_GRACE_BLOCKS
 
 ### Logs and sensitive state
 
-Logs are JSON lines on stdout. HTTP entries contain method, route, status, error code and duration, without request bodies. Lifecycle entries identify the request and transaction. Structured redaction removes signing fields; string scrubbing removes URL tokens and long hexadecimal payloads. Avoid adding arbitrary secrets to log messages.
+Logs are JSON lines on stdout. `level` is the level's name (`info`, `warn`, `error`, `fatal`), which log platforms map to a severity. The ALERT lines of the relay's own checks carry an `alert` field with a stable key (`insufficient_funds`, `head_stale`, `decision_wait`, `nonce_filler`, `gas_budget`, `price_unavailable`, `token_domain_mismatch`, `token_implementation_unavailable`, `rpc_history`), and the alert monitor's lines carry `condition` and `alertState`, so that a log search can select them. HTTP entries contain method, route, status, error code and duration, without request bodies. Lifecycle entries identify the request and transaction. Structured redaction removes signing fields; string scrubbing removes URL tokens and long hexadecimal payloads. Avoid adding arbitrary secrets to log messages.
 
 Protect the key and database as sensitive inputs. Pending requests require persisted intent signatures, token authorizations and signed transactions for recovery. They are purged when the outcome settles; storage snapshots and backups can retain older copies.
 
