@@ -14,6 +14,8 @@ Keep one intent nonce per payment. Corrections reuse that nonce. After a timeout
 
 USDT0 meta-transaction approvals have no expiry. Prefer permit when available and avoid retaining or logging reusable signatures.
 
+Intent signatures are ECDSA only, so smart-contract accounts cannot sign intents. USDC verifies the permit of an account with code, including an EIP-7702-delegated EOA, through ERC-1271 instead of ECDSA. Check for code at the sender address before offering the USDC permit mode; for an account with code, use a one-time approval with the existing-allowance mode instead (protocol reference §5).
+
 ## Contract trust assumptions
 
 - The contract has no pause, rescue or upgrade mechanism. A contract change requires a new deployment and updated client configuration.
