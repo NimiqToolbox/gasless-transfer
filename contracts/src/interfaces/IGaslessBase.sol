@@ -63,13 +63,22 @@ interface IGaslessBase is IERC5267 {
     ///         if no other referenced struct name sorts after "TokenAuth" (GaslessTransfer references no other).
     function TOKEN_AUTH_TYPE() external view returns (string memory);
 
+    /// @notice keccak256 of TOKEN_AUTH_TYPE(): the EIP-712 type hash that a signed request's TokenAuth member is
+    ///         hashed with.
+    /// @return The TokenAuth type hash.
     function TOKEN_AUTH_TYPEHASH() external view returns (bytes32);
 
     /// @notice The nonce the next request of `signer` must be signed with.
     function nonces(address signer) external view returns (uint256);
 
+    /// @notice The configuration of `token`: the auth modes it accepts. All false means the token is not supported.
+    /// @param token The token to look up.
+    /// @return The configuration of `token`.
     function tokenConfig(address token) external view returns (TokenConfig memory);
 
+    /// @notice The EIP-712 domain separator that every request of this contract is signed under. eip712Domain()
+    ///         (EIP-5267) returns the fields it is built from.
+    /// @return The domain separator of this contract on the current chain.
     function DOMAIN_SEPARATOR() external view returns (bytes32);
 
     /// @notice Raises msg.sender's next nonce to `newNonce`, so that no request signed for a lower nonce can execute.
